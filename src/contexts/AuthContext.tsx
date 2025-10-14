@@ -50,27 +50,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session ? 'Session exists' : 'No session');
+      console.log('Auth state changed:', event);
       
       if (event === 'SIGNED_IN' && session) {
-        console.log('User signed in, loading profile...');
         await loadUserProfile(session.user);
         setIsLoading(false);
       } else if (event === 'SIGNED_OUT') {
-        console.log('User signed out');
         setUser(null);
         secureStorage.clear();
         setIsLoading(false);
       } else if (event === 'TOKEN_REFRESHED' && session) {
-        console.log('Token refreshed');
         await loadUserProfile(session.user);
-      } else if (event === 'INITIAL_SESSION') {
-        if (session) {
-          console.log('Initial session found, loading profile...');
-          await loadUserProfile(session.user);
-        } else {
-          console.log('No initial session');
-        }
+      } else if (event === 'INITIAL_SESSION' && session) {
+        await loadUserProfile(session.user);
         setIsLoading(false);
       }
     });
@@ -84,7 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadUserProfile = async (supabaseUser: SupabaseUser): Promise<void> => {
     try {
       setIsLoading(true);
-      console.log('Loading profile for user:', supabaseUser.id);
       
       // Fetch user profile from profiles table
       const { data: profile, error: profileError } = await (supabase as any)
@@ -93,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', supabaseUser.id)
         .maybeSingle();
 
-      if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      if (profileError) {
         console.error('Error loading profile:', profileError);
       }
 
@@ -104,13 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('user_id', supabaseUser.id)
         .maybeSingle();
 
-      if (businessError && businessError.code !== 'PGRST116') {
+      if (businessError) {
         console.error('Error loading business settings:', businessError);
       }
 
       // Create user object with proper null handling
-      const userName = (profile?.full_name) || (businessSettings?.owner_name) || supabaseUser.email?.split('@')[0] || 'User';
-      const businessName = businessSettings?.business_name || undefined;
+      const userName = (profile && profile.full_name) || (businessSettings && businessSettings.owner_name) || supabaseUser.email?.split('@')[0] || 'User';
+      const businessName = businessSettings && businessSettings.business_name ? businessSettings.business_name : undefined;
 
       const userData: User = {
         id: supabaseUser.id,
@@ -121,7 +112,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastLogin: new Date().toISOString()
       };
 
-      console.log('User profile loaded successfully:', userData.email);
       setUser(userData);
       
       // Store user data in secure storage for quick access
@@ -130,16 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
     } catch (error) {
       console.error('Failed to load user profile:', error);
-      // Don't show error toast, just log it - user can still be authenticated
-      // Create minimal user object
-      const userData: User = {
-        id: supabaseUser.id,
-        email: supabaseUser.email || '',
-        name: supabaseUser.email?.split('@')[0] || 'User',
-        role: 'admin',
-        lastLogin: new Date().toISOString()
-      };
-      setUser(userData);
+      toast.error('Failed to load user profile');
     } finally {
       setIsLoading(false);
     }

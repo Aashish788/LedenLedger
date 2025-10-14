@@ -15,7 +15,6 @@ const Login = () => {
   const location = useLocation();
   const { login, isLoading, isAuthenticated } = useAuth();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
   
   const [formData, setFormData] = useState({
     email: "",
@@ -29,52 +28,24 @@ const Login = () => {
 
   // Handle OAuth callback - redirect authenticated users
   useEffect(() => {
-    // Only redirect after we've checked auth at least once
-    if (isAuthenticated && !isLoading) {
-      console.log('User is authenticated, redirecting to:', from);
+    if (isAuthenticated) {
       navigate(from, { replace: true });
-    } else if (!isLoading) {
-      setHasCheckedAuth(true);
     }
-  }, [isAuthenticated, isLoading, navigate, from]);
+  }, [isAuthenticated, navigate, from]);
 
   // Check for OAuth errors in URL
   useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const errorDescription = hashParams.get('error_description');
     const error = hashParams.get('error');
-    const accessToken = hashParams.get('access_token');
 
     if (error || errorDescription) {
-      console.error('OAuth error:', error, errorDescription);
       setIsGoogleLoading(false);
       toast.error('Authentication failed', {
         description: errorDescription || error || 'Please try again'
       });
       // Clean up the URL
       window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (accessToken) {
-      // OAuth callback with token - show loading
-      console.log('OAuth callback detected with access token');
-      setIsGoogleLoading(true);
-      // The auth state listener will handle the session
-      // Clean up URL after a short delay
-      setTimeout(() => {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }, 1000);
-      
-      // Timeout fallback - if still loading after 10 seconds, stop loading
-      const timeout = setTimeout(() => {
-        if (isGoogleLoading && !isAuthenticated) {
-          console.error('OAuth loading timeout');
-          setIsGoogleLoading(false);
-          toast.error('Authentication taking too long', {
-            description: 'Please try again or use email/password login'
-          });
-        }
-      }, 10000);
-      
-      return () => clearTimeout(timeout);
     }
   }, []);
 
@@ -120,13 +91,10 @@ const Login = () => {
     try {
       setIsGoogleLoading(true);
       
-      // Get the current URL origin for proper redirect
-      const redirectUrl = `${window.location.origin}/dashboard`;
-      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl,
+          redirectTo: `${window.location.origin}/login`,
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account',
@@ -139,7 +107,7 @@ const Login = () => {
         console.error('Google login error:', error);
         setIsGoogleLoading(false);
         toast.error('Google login failed', {
-          description: error.message || 'Please try again or use email/password login'
+          description: 'Please try again or use email/password login'
         });
         return;
       }
@@ -149,9 +117,7 @@ const Login = () => {
     } catch (error) {
       console.error('Google login error:', error);
       setIsGoogleLoading(false);
-      toast.error('Google login failed', {
-        description: 'An unexpected error occurred. Please try again.'
-      });
+      toast.error('Google login failed');
     }
   };
 
