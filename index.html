@@ -3,9 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lenden Ledger - Smart Business Accounting & Management</title>
-    <meta name="description" content="Professional accounting solution for small businesses. Track customers, manage invoices, handle cash flow - all in one place. Free forever plan available." />
+    <title>Lenden Ledger — Smart Billing, Invoicing, Cashbook & Business Management</title>
+    <meta name="description" content="Lenden Ledger helps Indian businesses manage lenden (give & take), billing, invoicing, cashbook, customers, suppliers, and reports in one place. Fast, secure, and easy like Khatabook & Vyapar—built for growth." />
     <meta name="author" content="Lenden Ledger" />
+    <meta name="robots" content="index,follow" />
+    <meta name="keywords" content="lenden, lenden ledger, khatabook, vyapar, billing, invoice, invoicing, cashbook, udhar, business managing, accounting software, gst invoice, sales, purchases, receipts, expenses" />
+
+  <!-- Canonical URL (static default to domain; JS updates path for SPA routes) -->
+  <link id="canonical-link" rel="canonical" href="https://lendenledger.in/" />
+
+    <!-- Theme color for light/dark -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#10b981" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b3b2f" />
     
     <!-- Favicons - Multiple sizes for better display -->
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
@@ -18,14 +27,55 @@
     <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512x512.png" />
     <link rel="manifest" href="/manifest.json" />
 
-    <meta property="og:title" content="Lenden Ledger - Smart Business Accounting & Management" />
-    <meta property="og:description" content="Professional accounting solution for small businesses. Track customers, manage invoices, handle cash flow - all in one place." />
+    <meta property="og:title" content="Lenden Ledger — Smart Billing, Invoicing & Business Management" />
+    <meta property="og:description" content="Manage lenden, billing, invoicing, cashbook, customers and suppliers. Simple like Khatabook & Vyapar—powerful for modern SMEs." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/icon.png" />
+    <meta property="og:site_name" content="Lenden Ledger" />
+  <meta property="og:image" content="https://lendenledger.in/icon.png" />
+  <meta property="og:url" content="https://lendenledger.in/" id="og-url" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@LendenLedger" />
-    <meta name="twitter:image" content="/icon.png" />
+    <meta name="twitter:title" content="Lenden Ledger — Smart Billing, Invoicing & Business Management" />
+    <meta name="twitter:description" content="All-in-one business bookkeeping: invoices, cashbook, customers, suppliers, GST-ready reports." />
+  <meta name="twitter:image" content="https://lendenledger.in/icon.png" />
+  <meta name="twitter:url" content="https://lendenledger.in/" id="twitter-url" />
+
+    <!-- Structured Data: Organization & SoftwareApplication -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Lenden Ledger",
+  "url": "https://lendenledger.in/",
+        "logo": "/icon.png",
+        "description": "Smart business accounting and lenden (give & take) management for SMEs with billing, invoicing, and cashbook.",
+        "keywords": "lenden, lenden ledger, khatabook, vyapar, billing, invoice, cashbook, business managing, accounting"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Lenden Ledger",
+        "url": "https://lendenledger.in/"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Lenden Ledger",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "image": "/icon.png",
+        "offers": {
+          "@type": "Offer",
+          "price": "0"
+        },
+        "description": "Manage billing, invoices, cashbook, customers and suppliers with an easy, fast, and secure web app."
+      }
+    </script>
     
     <style>
       /* Prevent flash of unstyled content */
@@ -34,6 +84,33 @@
         color: #e6e6e6;
       }
     </style>
+
+    <!-- Minimal runtime to set absolute canonical/OG/Twitter URLs without UI changes -->
+    <script>
+      (function () {
+        try {
+          var href = window.location.origin + window.location.pathname;
+          var canonical = document.getElementById('canonical-link');
+          if (canonical) canonical.setAttribute('href', href);
+          var og = document.getElementById('og-url');
+          if (og) og.setAttribute('content', href);
+          var tw = document.getElementById('twitter-url');
+          if (tw) tw.setAttribute('content', href);
+
+          // Update JSON-LD Organization url if present
+          var ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+          ldScripts.forEach(function (s) {
+            try {
+              var data = JSON.parse(s.textContent || '{}');
+              if (data['@type'] === 'Organization' && !data.url) {
+                data.url = href;
+                s.textContent = JSON.stringify(data);
+              }
+            } catch (e) {}
+          });
+        } catch (e) {}
+      })();
+    </script>
   </head>
 
   <body>

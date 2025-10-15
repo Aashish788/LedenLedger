@@ -71,3 +71,19 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## SEO Enhancements
+
+This project includes production-ready SEO setup aligned with Google's SEO starter guide:
+
+- index.html: Optimized title, meta description, keywords, robots, canonical, Open Graph, Twitter Card, and JSON-LD (Organization + SoftwareApplication).
+- public/robots.txt: Allows crawling and references sitemap.xml.
+- public/sitemap.xml: Lists key routes; update as routes change.
+- public/manifest.json and favicons: PWA metadata and icons.
+
+Maintenance tips:
+
+- Keep the homepage title and description concise (50–60 chars for title, ~155–160 chars for description).
+- When adding new top-level routes, add them to sitemap.xml and deploy.
+- Ensure the site is served with a single preferred domain (www or apex) and HTTPS.
+- Use meaningful headings and alt text inside pages; avoid duplicating titles across routes.
