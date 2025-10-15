@@ -11,6 +11,8 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { validateEnvironment } from "@/lib/security";
 import { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 // Lazy load components for better performance
 const Landing = lazy(() => import("./pages/Landing"));
@@ -227,6 +229,8 @@ const App = () => {
                     </Routes>
                   </Suspense>
                 </BrowserRouter>
+                <Analytics />
+                <SpeedInsights />
               </TooltipProvider>
             </CurrencyProvider>
           </BusinessProvider>
