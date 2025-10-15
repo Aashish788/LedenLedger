@@ -1,12 +1,16 @@
 /**
- * Authentication Context with Security Features
- * Provides authentication state and security controls throughout the app
+ * Authentication Context with Premium Persistence
+ * Implements Gmail/Khatabook-style instant auth state
+ * - Optimistic loading from cache
+ * - Background session validation
+ * - Smart state management
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { secureStorage, generateCSRFToken, checkRateLimit } from '@/lib/security';
+import { authCache } from '@/lib/authCache';
 import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 export interface User {
@@ -31,8 +35,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Initialize with cached state for instant loading (like Gmail)
+  const cachedState = authCache.get();
+  const [user, setUser] = useState<User | null>(cachedState?.user || null);
+  const [isLoading, setIsLoading] = useState(false); // Start with false for optimistic loading
   const [csrfToken, setCsrfToken] = useState(generateCSRFToken());
 
   // Generate new CSRF token periodically
@@ -44,26 +50,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Check authentication status on mount and set up auth listener
+  // Professional initialization - check session in background only if needed
   useEffect(() => {
-    checkSession();
+    // If we have cached auth, validate in background (non-blocking)
+    const initAuth = async () => {
+      if (cachedState?.isAuthenticated) {
+        // User sees UI immediately, we validate in background
+        validateSessionInBackground();
+      } else {
+        // No cache, check session (but only once on mount)
+        await checkSession();
+      }
+    };
+
+    initAuth();
     
-    // Listen for auth state changes
+    // Listen for auth state changes (token refresh, logout, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event);
       
       if (event === 'SIGNED_IN' && session) {
-        await loadUserProfile(session.user);
-        setIsLoading(false);
+        await loadUserProfile(session.user, false);
       } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        secureStorage.clear();
-        setIsLoading(false);
+        handleSignOut();
       } else if (event === 'TOKEN_REFRESHED' && session) {
-        await loadUserProfile(session.user);
-      } else if (event === 'INITIAL_SESSION' && session) {
-        await loadUserProfile(session.user);
-        setIsLoading(false);
+        // Silent refresh - update cache without showing loading
+        await loadUserProfile(session.user, false);
       }
     });
 
@@ -72,10 +84,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Load user profile from database
-  const loadUserProfile = async (supabaseUser: SupabaseUser): Promise<void> => {
+  /**
+   * Validate session in background without blocking UI
+   */
+  const validateSessionInBackground = async (): Promise<void> => {
+    // Don't check if we checked recently
+    if (!authCache.shouldCheckSession()) {
+      return;
+    }
+
     try {
-      setIsLoading(true);
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error || !session) {
+        // Session invalid, clear cache and state
+        handleSignOut();
+        return;
+      }
+
+      // Session valid, update cache timestamp
+      authCache.markSessionChecked();
+      
+      // Optionally refresh user profile if data might be stale
+      // But don't show loading state
+      await loadUserProfile(session.user, false);
+    } catch (error) {
+      console.error('Background session validation failed:', error);
+      // Don't logout on network errors, keep using cache
+    }
+  };
+
+  /**
+   * Handle sign out - clear everything
+   */
+  const handleSignOut = (): void => {
+    setUser(null);
+    authCache.clear();
+    secureStorage.clear();
+    setIsLoading(false);
+  };
+
+  // Load user profile from database
+  const loadUserProfile = async (supabaseUser: SupabaseUser, showLoading: boolean = true): Promise<void> => {
+    try {
+      if (showLoading) {
+        setIsLoading(true);
+      }
       
       // Fetch user profile from profiles table
       const { data: profile, error: profileError } = await (supabase as any)
@@ -114,41 +168,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(userData);
       
+      // Update cache for instant access on next load
+      authCache.set(userData, true);
+      
       // Store user data in secure storage for quick access
       secureStorage.setItem('auth_user', userData);
       secureStorage.setItem('last_activity', Date.now());
       
     } catch (error) {
       console.error('Failed to load user profile:', error);
-      toast.error('Failed to load user profile');
+      if (showLoading) {
+        toast.error('Failed to load user profile');
+      }
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   };
 
   const checkSession = async (): Promise<void> => {
     try {
-      setIsLoading(true);
+      // Don't show loading for background checks
+      const shouldShowLoading = !authCache.isAuthenticated();
+      
+      if (shouldShowLoading) {
+        setIsLoading(true);
+      }
       
       // Check Supabase session
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
         console.error('Session check error:', error);
-        await logout();
+        handleSignOut();
         return;
       }
 
       if (session?.user) {
-        await loadUserProfile(session.user);
+        await loadUserProfile(session.user, shouldShowLoading);
+        authCache.markSessionChecked();
       } else {
         // No active session
-        setUser(null);
-        secureStorage.clear();
+        handleSignOut();
       }
     } catch (error) {
       console.error('Session check failed:', error);
-      await logout();
+      // On error, if we have cache, keep using it (offline support)
+      if (!authCache.isAuthenticated()) {
+        handleSignOut();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -214,7 +283,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Load user profile
-      await loadUserProfile(data.user);
+      await loadUserProfile(data.user, true);
+
+      // Update cache
+      authCache.markSessionChecked();
 
       // Update last activity
       secureStorage.setItem('last_activity', Date.now());
@@ -247,19 +319,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Continue with local cleanup even if server logout fails
       }
       
-      // Clear secure storage
-      secureStorage.clear();
-      
-      // Clear user state
-      setUser(null);
+      // Clear everything
+      handleSignOut();
       
       toast.success('Logged out successfully');
     } catch (error) {
       console.error('Logout failed:', error);
       
       // Force local cleanup
-      secureStorage.clear();
-      setUser(null);
+      handleSignOut();
       
       toast.error('Logout completed with errors');
     } finally {

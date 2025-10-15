@@ -1,9 +1,12 @@
 /**
- * Protected Route Component with Authentication Guards
- * Ensures only authenticated users can access protected pages
+ * Protected Route Component - Premium Edition
+ * Instant navigation like Gmail/Khatabook
+ * - No loading states on route changes
+ * - Trust cached auth state
+ * - Background validation only
  */
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
@@ -19,23 +22,20 @@ export function ProtectedRoute({
   requireAdmin = false, 
   fallbackPath = '/login' 
 }: ProtectedRouteProps) {
-  const { user, isAuthenticated, isLoading, checkSession } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
-  // Re-check session on route change
-  useEffect(() => {
-    if (!isAuthenticated && !isLoading) {
-      checkSession();
-    }
-  }, [location.pathname, isAuthenticated, isLoading, checkSession]);
+  // REMOVED: Session check on route change - causes flickering
+  // The AuthContext handles session validation in background
+  // This provides instant navigation like premium apps
 
-  // Show loading state while checking authentication
-  if (isLoading) {
+  // Only show loading on initial app load (not on route changes)
+  if (isLoading && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Verifying authentication...</p>
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -90,7 +90,7 @@ export function ProtectedRoute({
 
 /**
  * Public Route Component - Only accessible when NOT authenticated
- * Useful for login/register pages
+ * Instant redirects without loading states
  */
 interface PublicOnlyRouteProps {
   children: ReactNode;
@@ -98,9 +98,10 @@ interface PublicOnlyRouteProps {
 }
 
 export function PublicOnlyRoute({ children, redirectPath = '/dashboard' }: PublicOnlyRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   
-  if (isLoading) {
+  // Only show loading on initial app load
+  if (isLoading && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -108,6 +109,7 @@ export function PublicOnlyRoute({ children, redirectPath = '/dashboard' }: Publi
     );
   }
 
+  // Instant redirect if authenticated (no loading state)
   if (isAuthenticated) {
     return <Navigate to={redirectPath} replace />;
   }
