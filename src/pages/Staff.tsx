@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Users, UserCheck, UserX, Mail, Phone, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { staffService } from "@/lib/staffService";
+import { staffService } from "@/services/api/staffService";
 import { Staff } from "@/types/staff";
 import { AddStaffModal } from "@/components/AddStaffModal";
 import { Badge } from "@/components/ui/badge";
@@ -36,12 +36,13 @@ export default function StaffPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [sortBy, setSortBy] = useState("recent");
+  const [localStaffMembers, setLocalStaffMembers] = useState<Staff[]>([]);
 
   // Transform Supabase staff to local format
   const staffMembers = useMemo(() => {
-    if (!supabaseStaff) return [];
+    if (!supabaseStaff) return localStaffMembers;
     
-    return supabaseStaff.map((ss: SupabaseStaffMember): Staff => ({
+    const transformed = supabaseStaff.map((ss: SupabaseStaffMember): Staff => ({
       id: ss.id,
       name: ss.name,
       phone: ss.phone,
@@ -64,6 +65,10 @@ export default function StaffPage() {
       createdAt: new Date(ss.created_at).toISOString(),
       updatedAt: new Date(ss.updated_at).toISOString(),
     }));
+    
+    // Update local state when server data changes
+    setLocalStaffMembers(transformed);
+    return transformed;
   }, [supabaseStaff]);
 
   // Calculate statistics
@@ -113,10 +118,20 @@ export default function StaffPage() {
   }, [staffMembers, searchQuery, statusFilter, sortBy]);
 
   const handleStaffAdded = async (newStaff: Staff) => {
-    // Refetch staff after adding a new one
-    await refetch();
+    console.log('⚡ Staff member added, updating UI instantly...', newStaff);
+    
+    // INSTANT UI update (optimistic)
+    setLocalStaffMembers(prevStaff => [newStaff, ...prevStaff]);
     setIsAddModalOpen(false);
-    toast.success("Staff member added successfully");
+    
+    console.log('✅ UI updated instantly with new staff member');
+    
+    // Background sync with smart merge
+    setTimeout(() => {
+      refetch().then(() => {
+        console.log('🔄 Background sync completed');
+      });
+    }, 500);
   };
 
   const handleStaffClick = (staff: Staff) => {

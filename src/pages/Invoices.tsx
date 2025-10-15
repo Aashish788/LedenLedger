@@ -41,12 +41,13 @@ export default function Invoices() {
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [localInvoices, setLocalInvoices] = useState<Invoice[]>([]);
 
   // Transform Supabase invoices to local format
   const invoices = useMemo(() => {
-    if (!supabaseInvoices) return [];
+    if (!supabaseInvoices) return localInvoices;
     
-    return supabaseInvoices.map((si: SupabaseInvoice): Invoice => ({
+    const transformed = supabaseInvoices.map((si: SupabaseInvoice): Invoice => ({
       id: si.id,
       customerName: si.customer_name,
       invoiceNumber: si.bill_number,
@@ -61,13 +62,44 @@ export default function Invoices() {
       createdAt: new Date(si.created_at),
       status: si.status as "draft" | "sent" | "paid" | "overdue",
     }));
+    
+    // Update local state when server data changes
+    setLocalInvoices(transformed);
+    return transformed;
   }, [supabaseInvoices]);
 
   const handleInvoiceAdded = async (invoiceData: any) => {
-    // Refetch invoices after adding a new one
-    await refetch();
+    console.log('⚡ Invoice created, updating UI instantly...', invoiceData);
+    
+    // Create optimistic invoice entry
+    const newInvoice: Invoice = {
+      id: invoiceData.id || `temp-${Date.now()}`,
+      customerName: invoiceData.customer_name,
+      invoiceNumber: invoiceData.bill_number,
+      invoiceDate: invoiceData.bill_date,
+      dueDate: invoiceData.due_date,
+      taxRate: invoiceData.gst_rate?.toString() || "0",
+      notes: invoiceData.notes,
+      items: invoiceData.items || [],
+      subtotal: Number(invoiceData.subtotal),
+      tax: Number(invoiceData.gst_amount),
+      total: Number(invoiceData.total),
+      createdAt: new Date(invoiceData.created_at || Date.now()),
+      status: invoiceData.status || 'draft',
+    };
+    
+    // INSTANT UI update
+    setLocalInvoices(prevInvoices => [newInvoice, ...prevInvoices]);
     setIsAddModalOpen(false);
-    toast.success("Invoice created successfully");
+    
+    console.log('✅ UI updated instantly with new invoice');
+    
+    // Background sync
+    setTimeout(() => {
+      refetch().then(() => {
+        console.log('🔄 Background sync completed');
+      });
+    }, 500);
   };
 
   const handleDeleteInvoice = async (id: string) => {
@@ -246,10 +278,7 @@ export default function Invoices() {
       <CreateInvoiceModal
         open={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}
-        onSuccess={() => {
-          // Refresh invoices list or handle success
-          toast.success("Invoice created successfully!");
-        }}
+        onSuccess={handleInvoiceAdded}
       />
     </DashboardLayout>
   );

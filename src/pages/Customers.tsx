@@ -105,49 +105,74 @@ export default function Customers() {
   const handleTransactionAdded = async (transactionData: any) => {
     if (!selectedCustomer) return;
 
-    // Calculate new balance
-    const currentBalance = parseFloat(selectedCustomer.openingBalance || "0");
-    const transactionAmount = parseFloat(transactionData.amount);
+    console.log('⚡ Transaction added, updating UI INSTANTLY...', transactionData);
     
-    let newBalance = currentBalance;
-    if (transactionData.type === "got") {
-      // Customer paid us - reduces what they owe (or increases what we owe)
-      if (selectedCustomer.balanceType === "credit") {
-        newBalance = currentBalance - transactionAmount;
-      } else {
-        newBalance = currentBalance + transactionAmount;
-      }
-    } else {
-      // We paid customer - increases what they owe (or reduces what we owe)
-      if (selectedCustomer.balanceType === "credit") {
-        newBalance = currentBalance + transactionAmount;
-      } else {
-        newBalance = currentBalance - transactionAmount;
-      }
-    }
-
+    // Create the new transaction object
     const newTransaction: Transaction = {
-      id: Date.now().toString(),
-      date: new Date(transactionData.date),
-      type: transactionData.type,
-      amount: transactionAmount,
-      balance: newBalance,
-      note: transactionData.description || undefined,
+      id: transactionData.id,
+      date: transactionData.date,
+      type: transactionData.type === 'received' ? 'got' : 'gave',
+      amount: parseFloat(transactionData.amount || transactionData.amount),
+      balance: parseFloat(selectedCustomer.openingBalance || "0"),
+      note: transactionData.description,
     };
 
-    // Update customer with new transaction
-    const updatedCustomer = {
-      ...selectedCustomer,
-      openingBalance: Math.abs(newBalance).toString(),
-      balanceType: newBalance >= 0 ? selectedCustomer.balanceType : (selectedCustomer.balanceType === "credit" ? "debit" : "credit"),
-      transactions: [newTransaction, ...(selectedCustomer.transactions || [])],
-    };
-
-    // Update selected customer locally
-    setSelectedCustomer(updatedCustomer);
+    // IMMEDIATELY update UI (optimistic update)
+    setSelectedCustomer(prevCustomer => {
+      if (!prevCustomer) return null;
+      return {
+        ...prevCustomer,
+        transactions: [newTransaction, ...(prevCustomer.transactions || [])],
+      };
+    });
     
-    // Refetch to get updated data from server
-    await refetch();
+    console.log('✅ UI updated instantly');
+    
+    // Background sync with SMART MERGE (don't replace, merge!)
+    setTimeout(() => {
+      refetch().then(() => {
+        if (supabaseCustomers) {
+          const serverCustomer = supabaseCustomers.find((c: any) => c.id === selectedCustomer.id);
+          if (serverCustomer) {
+            const serverTransactions = serverCustomer.transactions?.map((t: any) => ({
+              id: t.id,
+              date: t.date,
+              type: t.type === 'received' ? 'got' : 'gave',
+              amount: parseFloat(t.amount),
+              balance: parseFloat(t.amount),
+              note: t.description,
+            })) || [];
+            
+            // SMART MERGE: Keep optimistic transaction if not yet on server
+            setSelectedCustomer(prev => {
+              if (!prev) return null;
+              
+              const optimisticIds = prev.transactions?.map(t => t.id) || [];
+              const serverIds = serverTransactions.map(t => t.id);
+              
+              // Keep optimistic transactions not yet confirmed by server
+              const optimisticOnly = prev.transactions?.filter(t => !serverIds.includes(t.id)) || [];
+              
+              console.log('🔄 Merge: Optimistic only:', optimisticOnly.length, 'Server:', serverTransactions.length);
+              
+              return {
+                id: serverCustomer.id,
+                name: serverCustomer.name,
+                phone: serverCustomer.phone,
+                email: serverCustomer.email,
+                address: serverCustomer.address,
+                gstNumber: serverCustomer.gst_number,
+                openingBalance: serverCustomer.amount?.toString() || "0",
+                balanceType: parseFloat(serverCustomer.amount || 0) >= 0 ? "credit" : "debit",
+                createdAt: serverCustomer.created_at,
+                // Merge: optimistic transactions + server transactions (deduplicated)
+                transactions: [...optimisticOnly, ...serverTransactions],
+              };
+            });
+          }
+        }
+      });
+    }, 500); // 500ms delay for DB commit
   };
 
   // Calculate totals
@@ -442,6 +467,7 @@ export default function Customers() {
       />
 
       <CustomerDetailPanel
+        key={`${selectedCustomer?.id}-${selectedCustomer?.transactions?.length || 0}`}
         customer={selectedCustomer}
         isOpen={isPanelOpen}
         onClose={handleClosePanel}

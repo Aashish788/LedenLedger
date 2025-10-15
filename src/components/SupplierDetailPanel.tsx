@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { X, FileText, MessageSquare, Send, Calendar, Plus, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
+import { format, parseISO, isValid } from "date-fns";
 import { AddTransactionModal } from "@/components/AddTransactionModal";
 import { PartyProfileModal } from "@/components/PartyProfileModal";
 
 interface Transaction {
   id: string;
-  date: Date;
+  date: Date | string;
   type: "gave" | "got";
   amount: number;
   balance: number;
@@ -23,7 +23,7 @@ interface Supplier {
   gstNumber?: string;
   openingBalance?: string;
   balanceType: "credit" | "debit";
-  createdAt: Date;
+  createdAt: Date | string;
   transactions?: Transaction[];
 }
 
@@ -45,6 +45,51 @@ export function SupplierDetailPanel({ supplier, isOpen, onClose, onTransactionAd
   const transactions = supplier.transactions || [];
   const balance = parseFloat(supplier.openingBalance || "0");
   const isCredit = supplier.balanceType === "credit";
+
+  // Debug logging
+  console.log('📋 SupplierDetailPanel render:', {
+    supplierId: supplier.id,
+    supplierName: supplier.name,
+    transactionsCount: transactions.length,
+    transactions: transactions,
+    balance: balance,
+  });
+
+  // Helper function to safely format dates
+  const safeFormatDate = (date: Date | string | undefined | null, formatStr: string): string => {
+    if (!date) return "N/A";
+    
+    try {
+      let dateObj: Date;
+      
+      // If it's already a Date object
+      if (date instanceof Date) {
+        dateObj = date;
+      } 
+      // If it's a string, try to parse it
+      else if (typeof date === 'string') {
+        // Try ISO format first
+        if (date.includes('T') || date.includes('Z')) {
+          dateObj = parseISO(date);
+        } else {
+          // Simple date format like "2025-10-07"
+          dateObj = new Date(date);
+        }
+      } else {
+        return "Invalid Date";
+      }
+      
+      // Check if the date is valid
+      if (!isValid(dateObj)) {
+        return "Invalid Date";
+      }
+      
+      return format(dateObj, formatStr);
+    } catch (error) {
+      console.error('Date formatting error:', error, 'Date value:', date);
+      return "Invalid Date";
+    }
+  };
 
   const getInitials = (name: string) => {
     const words = name.trim().split(" ");
@@ -326,7 +371,7 @@ Best regards!`;
                       <span className="px-2 py-0.5 bg-blue-600/20 text-blue-400 text-xs rounded">OPENING BALANCE</span>
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {format(supplier.createdAt, "dd MMM yyyy")}
+                      {safeFormatDate(supplier.createdAt, "dd MMM yyyy")}
                     </div>
                   </div>
                   <div className="text-center">
@@ -358,7 +403,7 @@ Best regards!`;
                 >
                   <div className="col-span-1">
                     <div className="text-sm font-medium text-white">
-                      {format(transaction.date, "dd MMM yyyy")} • {format(transaction.date, "h:mm a")}
+                      {safeFormatDate(transaction.date, "dd MMM yyyy")}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       Balance: {transaction.balance < 0 ? '-' : ''}₹{Math.abs(transaction.balance).toFixed(0)}
@@ -412,6 +457,8 @@ Best regards!`;
         onOpenChange={setIsAddTransactionOpen}
         transactionType={transactionType}
         customerName={supplier.name}
+        partyId={supplier.id}
+        partyType="supplier"
         onTransactionAdded={handleTransactionAddedInternal}
       />
 

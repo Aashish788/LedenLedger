@@ -5,12 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { transactionsService } from "@/services/api/transactionsService";
 
 interface AddTransactionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transactionType: "gave" | "got" | null;
   customerName: string;
+  partyId: string;
+  partyType: "customer" | "supplier";
   onTransactionAdded?: (data: any) => void;
 }
 
@@ -19,6 +22,8 @@ export function AddTransactionModal({
   onOpenChange,
   transactionType,
   customerName,
+  partyId,
+  partyType,
   onTransactionAdded,
 }: AddTransactionModalProps) {
   const [formData, setFormData] = useState({
@@ -49,14 +54,53 @@ export function AddTransactionModal({
     }
 
     try {
-      const transactionData = {
-        ...formData,
-        type: transactionType,
-        customerName,
-        createdAt: new Date(),
-      };
+      // Convert the date string to ISO timestamp (with current time)
+      const dateObj = new Date(formData.date);
+      // Set to current time instead of midnight
+      const now = new Date();
+      dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+      const isoDate = dateObj.toISOString();
 
-      onTransactionAdded?.(transactionData);
+      // Convert UI type to database type
+      // UI: 'gave' | 'got'  →  Database: 'gave' | 'received'
+      const dbType = transactionType === 'got' ? 'received' : 'gave';
+
+      console.log("Saving transaction to Supabase:", {
+        party_id: partyId,
+        party_type: partyType,
+        amount: parseFloat(formData.amount),
+        type: dbType,
+        description: formData.description,
+        date: isoDate,
+      });
+
+      // Save to Supabase using transactionsService
+      const result = await transactionsService.createTransaction({
+        party_id: partyId,
+        party_type: partyType,
+        amount: parseFloat(formData.amount),
+        type: dbType as 'gave' | 'got', // Use database type
+        description: formData.description || `${transactionType === "gave" ? "Payment given to" : "Payment received from"} ${customerName}`,
+        date: isoDate,
+        payment_method: "cash", // Default, can be enhanced
+        reference_number: null,
+      });
+
+      console.log("Transaction service result:", result);
+
+      // Check for errors
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to save transaction');
+      }
+
+      if (!result.data) {
+        throw new Error('No data returned from transaction creation');
+      }
+
+      console.log("Transaction saved successfully:", result.data);
+
+      // Notify parent component with the actual saved data
+      onTransactionAdded?.(result.data);
 
       toast.success(
         `${transactionType === "gave" ? "Payment Given" : "Payment Received"}!`,
@@ -75,7 +119,10 @@ export function AddTransactionModal({
 
       onOpenChange(false);
     } catch (error) {
-      toast.error("Failed to add transaction");
+      console.error("Failed to save transaction:", error);
+      toast.error("Failed to add transaction", {
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+      });
     }
   };
 

@@ -34,12 +34,13 @@ export default function CashBook() {
   const [selectedTransaction, setSelectedTransaction] = useState<CashBookEntry | null>(null);
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<CashBookEntry | null>(null);
+  const [localEntries, setLocalEntries] = useState<CashBookEntry[]>([]);
 
   // Transform Supabase cash book entries to local format
   const entries = useMemo(() => {
-    if (!supabaseCashBook) return [];
+    if (!supabaseCashBook) return localEntries;
     
-    return supabaseCashBook.map((entry: SupabaseCashBookEntry): CashBookEntry => ({
+    const transformed = supabaseCashBook.map((entry: SupabaseCashBookEntry): CashBookEntry => ({
       id: entry.id,
       type: entry.type === 'in' ? 'cash_in' : 'cash_out',
       amount: entry.amount.toString(),
@@ -50,13 +51,40 @@ export default function CashBook() {
       reference: undefined,
       createdAt: new Date(entry.created_at),
     }));
+    
+    // Update local state when server data changes
+    setLocalEntries(transformed);
+    return transformed;
   }, [supabaseCashBook]);
 
   const handleEntryAdded = async (entryData: any) => {
-    // Refetch cash book entries after adding a new one
-    await refetch();
+    console.log('⚡ Cashbook entry added, updating UI instantly...', entryData);
+    
+    // Create new entry object from server data
+    const newEntry: CashBookEntry = {
+      id: entryData.id,
+      type: entryData.type === 'in' || entryData.type === 'cash_in' ? 'cash_in' : 'cash_out',
+      amount: entryData.amount?.toString() || '0',
+      category: entryData.category || 'General',
+      description: entryData.description,
+      date: new Date(entryData.date || entryData.timestamp).toISOString().split('T')[0],
+      paymentMethod: entryData.payment_method === 'cash' ? 'Cash' : 'Online',
+      reference: entryData.reference_number,
+      createdAt: new Date(entryData.created_at || Date.now()),
+    };
+    
+    // INSTANT UI update (optimistic)
+    setLocalEntries(prevEntries => [newEntry, ...prevEntries]);
     setIsAddModalOpen(false);
-    toast.success("Cash book entry added successfully");
+    
+    console.log('✅ UI updated instantly with new entry');
+    
+    // Background sync with smart merge
+    setTimeout(() => {
+      refetch().then(() => {
+        console.log('🔄 Background sync completed');
+      });
+    }, 500);
   };
 
   const handleEntryUpdated = async (updatedEntry: CashBookEntry & { id: string }) => {

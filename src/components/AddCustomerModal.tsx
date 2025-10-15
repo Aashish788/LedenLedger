@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { User, Mail, Phone, MapPin, IndianRupee } from "lucide-react";
 import { CustomerSchema, sanitizeInput, checkRateLimit } from "@/lib/security";
 import { z } from "zod";
+import { customersService } from "@/services/api/customersService";
 
 interface CustomerData {
   name: string;
@@ -67,8 +68,32 @@ export function AddCustomerModal({ open, onOpenChange, onCustomerAdded }: AddCus
 
       setIsSubmitting(true);
 
-      // Simulate API call - Replace with actual Supabase call later
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // ✅ ACTUAL SUPABASE SAVE - Real-time sync enabled!
+      console.log('🚀 Saving customer to Supabase:', sanitizedData);
+      
+      // Calculate the amount based on opening balance and type
+      const amount = parseFloat(sanitizedData.openingBalance || "0");
+      const finalAmount = sanitizedData.balanceType === "credit" ? amount : -amount;
+      
+      // Create customer in Supabase with real-time sync
+      const { data: newCustomer, error } = await customersService.createCustomer({
+        name: sanitizedData.name,
+        phone: sanitizedData.phone,
+        email: sanitizedData.email || undefined,
+        address: sanitizedData.address || undefined,
+        gst_number: sanitizedData.gstNumber || undefined,
+        amount: finalAmount,
+      });
+
+      if (error) {
+        console.error('❌ Error saving customer:', error);
+        toast.error("Failed to add customer", {
+          description: error.message || "Please try again later.",
+        });
+        return;
+      }
+
+      console.log('✅ Customer saved successfully:', newCustomer);
       
       // Pass the sanitized data to parent component
       onCustomerAdded?.(sanitizedData);

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Calendar } from "lucide-react";
+import { cashbookService } from "@/services/api/cashbookService";
 
 interface CashBookEntryData {
   type: "cash_in" | "cash_out";
@@ -83,11 +84,21 @@ export function AddCashBookModal({ open, onOpenChange, onEntryAdded, defaultType
     setIsSubmitting(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      
+      console.log("Saving cashbook entry to Supabase:", formData);
+
       if (isEditMode && editData) {
         // Update existing entry
+        const updatedEntry = await cashbookService.updateCashbookEntry(editData.id, {
+          type: formData.type,
+          amount: parseFloat(formData.amount),
+          category: formData.category,
+          description: formData.description,
+          date: formData.date,
+          payment_method: formData.paymentMethod as any,
+          reference_number: formData.reference,
+        });
+
+        console.log("Cashbook entry updated:", updatedEntry);
         onEntryUpdated?.({ ...formData, id: editData.id });
         
         toast.success("Transaction updated successfully!", {
@@ -95,7 +106,22 @@ export function AddCashBookModal({ open, onOpenChange, onEntryAdded, defaultType
         });
       } else {
         // Add new entry
-        onEntryAdded?.(formData);
+        const newEntry = await cashbookService.createCashbookEntry({
+          type: formData.type,
+          amount: parseFloat(formData.amount),
+          category: formData.category,
+          description: formData.description,
+          date: formData.date,
+          payment_method: formData.paymentMethod as any,
+          reference_number: formData.reference,
+        });
+
+        console.log("Cashbook entry created:", newEntry);
+        
+        // Pass the ACTUAL entry data from server (with ID) to parent
+        if (newEntry.data) {
+          onEntryAdded?.(newEntry.data as any);
+        }
         
         const typeLabel = formData.type === "cash_in" ? "Cash In" : "Cash Out";
         toast.success(`${typeLabel} entry added successfully!`, {
@@ -116,8 +142,9 @@ export function AddCashBookModal({ open, onOpenChange, onEntryAdded, defaultType
 
       onOpenChange(false);
     } catch (error) {
+      console.error("Failed to save cashbook entry:", error);
       toast.error("Failed to add entry", {
-        description: "Please try again later.",
+        description: error instanceof Error ? error.message : "Please try again later.",
       });
     } finally {
       setIsSubmitting(false);

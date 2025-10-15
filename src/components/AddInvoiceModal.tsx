@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { FileText, Calendar, IndianRupee, User, Plus, Trash2 } from "lucide-react";
+import { billsService } from "@/services/api/billsService";
 
 interface InvoiceItem {
   id: string;
@@ -109,21 +110,58 @@ export function AddInvoiceModal({ open, onOpenChange, onInvoiceAdded }: AddInvoi
     setIsSubmitting(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      console.log("Creating invoice/bill in Supabase:", formData);
+
+      // Note: This requires party_id which we don't have here
+      // The invoice modal needs to be updated to either:
+      // 1. Accept a customer/supplier ID as prop
+      // 2. Include a customer/supplier selector dropdown
+      // For now, this will create a local-only invoice until the modal is enhanced
+
+      // Calculate totals
+      const subtotal = calculateSubtotal();
+      const tax = calculateTax();
+      const total = calculateTotal();
+
+      // Transform items to match Bill interface
+      const billItems = items
+        .filter(item => item.description.trim())
+        .map((item) => ({
+          name: item.description,
+          description: null,
+          quantity: parseFloat(item.quantity) || 0,
+          unit_price: parseFloat(item.rate) || 0,
+          tax_rate: parseFloat(formData.taxRate) || 0,
+          discount_percentage: 0,
+          total: item.amount,
+        }));
+
+      // TODO: Uncomment when party_id is available
+      // const savedBill = await billsService.createBill({
+      //   bill_number: formData.invoiceNumber,
+      //   party_id: "CUSTOMER_ID_HERE", // Need to add customer selector
+      //   party_type: "customer",
+      //   party_name: formData.customerName,
+      //   date: formData.invoiceDate,
+      //   due_date: formData.dueDate || undefined,
+      //   items: billItems,
+      //   notes: formData.notes,
+      //   tax_amount: tax,
+      //   discount_amount: 0,
+      // });
       
-      // Pass the data to parent component
+      // Pass the data to parent component (for now, local only)
       const invoiceData: InvoiceData = {
         ...formData,
         items,
-        subtotal: calculateSubtotal(),
-        tax: calculateTax(),
-        total: calculateTotal(),
+        subtotal,
+        tax,
+        total,
       };
       onInvoiceAdded?.(invoiceData);
       
       toast.success("Invoice created successfully!", {
-        description: `Invoice ${formData.invoiceNumber} for ₹${calculateTotal().toFixed(2)} has been created.`,
+        description: `Invoice ${formData.invoiceNumber} for ₹${total.toFixed(2)} has been created.`,
       });
 
       // Reset form
@@ -139,8 +177,9 @@ export function AddInvoiceModal({ open, onOpenChange, onInvoiceAdded }: AddInvoi
 
       onOpenChange(false);
     } catch (error) {
+      console.error("Failed to create invoice:", error);
       toast.error("Failed to create invoice", {
-        description: "Please try again later.",
+        description: error instanceof Error ? error.message : "Please try again later.",
       });
     } finally {
       setIsSubmitting(false);

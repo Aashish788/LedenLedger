@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Building2, Mail, Phone, MapPin, IndianRupee } from "lucide-react";
+import { suppliersService } from "@/services/api/suppliersService";
 
 interface SupplierData {
   name: string;
@@ -52,8 +53,32 @@ export function AddSupplierModal({ open, onOpenChange, onSupplierAdded }: AddSup
     setIsSubmitting(true);
 
     try {
-      // Simulate API call - Replace with actual Supabase call later
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // ✅ ACTUAL SUPABASE SAVE - Real-time sync enabled!
+      console.log('🚀 Saving supplier to Supabase:', formData);
+      
+      // Calculate the amount based on opening balance and type
+      const amount = parseFloat(formData.openingBalance || "0");
+      const finalAmount = formData.balanceType === "credit" ? amount : -amount;
+      
+      // Create supplier in Supabase with real-time sync
+      const { data: newSupplier, error } = await suppliersService.createSupplier({
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email || undefined,
+        address: formData.address || undefined,
+        gst_number: formData.gstNumber || undefined,
+        amount: finalAmount,
+      });
+
+      if (error) {
+        console.error('❌ Error saving supplier:', error);
+        toast.error("Failed to add supplier", {
+          description: error.message || "Please try again later.",
+        });
+        return;
+      }
+
+      console.log('✅ Supplier saved successfully:', newSupplier);
       
       // Pass the data to parent component
       onSupplierAdded?.(formData);

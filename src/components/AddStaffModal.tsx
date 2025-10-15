@@ -30,7 +30,7 @@ import {
   AlertCircle,
   Settings,
 } from "lucide-react";
-import { staffService } from "@/lib/staffService";
+import { staffService } from "@/services/api/staffService";
 import { Staff, StaffFormData, STAFF_DEFAULTS } from "@/types/staff";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -196,36 +196,104 @@ export function AddStaffModal({
 
       if (isEditMode && editStaff) {
         // Update existing staff
-        const updated = await staffService.updateStaff(editStaff.id, {
+        const result = await staffService.updateStaff(editStaff.id, {
           name: formData.name,
           phone: formData.phone,
           email: formData.email || undefined,
           position: formData.position,
-          monthlySalary: formData.monthlySalary,
-          hireDate: formData.hireDate,
+          monthly_salary: formData.monthlySalary,
+          hire_date: formData.hireDate,
           address: formData.address || undefined,
-          emergencyContact: formData.emergencyContact || undefined,
+          emergency_contact: formData.emergencyContact || undefined,
           notes: formData.notes || undefined,
-          isActive: formData.isActive,
-          basicPercent: formData.basicPercent,
-          hraPercent: formData.hraPercent,
-          allowancesAmount: formData.allowancesAmount,
-          includePF: formData.includePF,
-          pfPercent: formData.pfPercent,
-          includeESI: formData.includeESI,
-          esiPercent: formData.esiPercent,
-          allowedLeaveDays: formData.allowedLeaveDays,
-        });
+          is_active: formData.isActive,
+          basic_percent: formData.basicPercent,
+          hra_percent: formData.hraPercent,
+          allowances_amount: formData.allowancesAmount,
+          include_pf: formData.includePF,
+          pf_percent: formData.pfPercent,
+          include_esi: formData.includeESI,
+          esi_percent: formData.esiPercent,
+          allowed_leave_days: formData.allowedLeaveDays,
+        } as any);
 
-        if (!updated) {
+        if (result.error || !result.data) {
           throw new Error("Failed to update staff");
         }
 
-        staff = updated;
+        // Transform API response to UI Staff type
+        const apiStaff = result.data as any;
+        staff = {
+          id: apiStaff.id,
+          name: apiStaff.name,
+          phone: apiStaff.phone,
+          email: apiStaff.email || undefined,
+          position: apiStaff.position,
+          monthlySalary: Number(apiStaff.monthly_salary),
+          hireDate: apiStaff.hire_date,
+          address: apiStaff.address || undefined,
+          emergencyContact: apiStaff.emergency_contact || undefined,
+          notes: apiStaff.notes || undefined,
+          isActive: apiStaff.is_active ?? true,
+          basicPercent: apiStaff.basic_percent ? Number(apiStaff.basic_percent) : undefined,
+          hraPercent: apiStaff.hra_percent ? Number(apiStaff.hra_percent) : undefined,
+          allowancesAmount: apiStaff.allowances_amount ? Number(apiStaff.allowances_amount) : undefined,
+          includePF: apiStaff.include_pf ?? false,
+          pfPercent: apiStaff.pf_percent ? Number(apiStaff.pf_percent) : undefined,
+          includeESI: apiStaff.include_esi ?? false,
+          esiPercent: apiStaff.esi_percent ? Number(apiStaff.esi_percent) : undefined,
+          allowedLeaveDays: apiStaff.allowed_leave_days ?? undefined,
+          createdAt: new Date(apiStaff.created_at).toISOString(),
+          updatedAt: new Date(apiStaff.updated_at).toISOString(),
+        };
         toast.success("Staff updated successfully!");
       } else {
-        // Add new staff
-        staff = await staffService.addStaff(formData);
+        // Map UI formData to API CreateStaffInput
+        const apiInput = {
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email || undefined,
+          position: formData.position,
+          monthly_salary: formData.monthlySalary,
+          hire_date: formData.hireDate,
+          is_active: formData.isActive,
+          address: formData.address || undefined,
+          emergency_contact: formData.emergencyContact || undefined,
+          notes: formData.notes || undefined,
+          basic_percent: formData.basicPercent,
+          hra_percent: formData.hraPercent,
+          allowances_amount: formData.allowancesAmount,
+          include_pf: formData.includePF,
+          pf_percent: formData.pfPercent,
+          include_esi: formData.includeESI,
+          esi_percent: formData.esiPercent,
+          allowed_leave_days: formData.allowedLeaveDays,
+        };
+        const apiResult = await staffService.addStaff(apiInput);
+        // Transform API response to UI Staff type
+        staff = {
+          id: apiResult.id,
+          name: apiResult.name,
+          phone: apiResult.phone,
+          email: apiResult.email || undefined,
+          position: apiResult.position,
+          monthlySalary: Number(apiResult.monthly_salary),
+          hireDate: apiResult.hire_date,
+          address: apiResult.address || undefined,
+          emergencyContact: apiResult.emergency_contact || undefined,
+          notes: apiResult.notes || undefined,
+          isActive: apiResult.is_active,
+          basicPercent: apiResult.basic_percent ? Number(apiResult.basic_percent) : undefined,
+          hraPercent: apiResult.hra_percent ? Number(apiResult.hra_percent) : undefined,
+          allowancesAmount: apiResult.allowances_amount ? Number(apiResult.allowances_amount) : undefined,
+          includePF: apiResult.include_pf ?? false,
+          pfPercent: apiResult.pf_percent ? Number(apiResult.pf_percent) : undefined,
+          includeESI: apiResult.include_esi ?? false,
+          esiPercent: apiResult.esi_percent ? Number(apiResult.esi_percent) : undefined,
+          allowedLeaveDays: apiResult.allowed_leave_days ?? undefined,
+          createdAt: new Date(apiResult.created_at).toISOString(),
+          updatedAt: new Date(apiResult.updated_at).toISOString(),
+        };
         toast.success("Staff added successfully!", {
           description: `${formData.name} has been added to your staff list.`,
         });

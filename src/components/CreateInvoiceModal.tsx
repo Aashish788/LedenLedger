@@ -43,7 +43,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface CreateInvoiceModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  onSuccess?: (invoiceData: any) => void;
 }
 
 export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: CreateInvoiceModalProps) {
@@ -114,7 +114,7 @@ export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: Cr
   const currency = useMemo(() => createCurrencyContext(currencyCode), [currencyCode]);
   
   // Invoice data for preview
-  const invoiceData: InvoiceData = useMemo(() => ({
+  const invoiceData = useMemo(() => ({
     billNumber,
     billDate,
     dueDate,
@@ -204,54 +204,81 @@ export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: Cr
     
     setIsSaving(true);
     try {
-      const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert({
-          invoice_number: billNumber,
-          invoice_date: billDate,
-          due_date: dueDate,
-          subtotal: calculations.subtotal,
-          tax_amount: calculations.gstAmount,
-          total_amount: calculations.total,
-          gst_type: gstType,
-          gst_rate: gstRate,
-          notes,
-          terms_and_conditions: termsAndConditions,
-          payment_instructions: paymentInstructions,
-          template_id: selectedTemplate,
-          currency_code: currencyCode,
-          status: 'draft'
-        })
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      // Map items to the format expected by database
+      const itemsData = items.map((item, index) => ({
+        id: `item-${Date.now()}-${index}`,
+        description: item.name,
+        quantity: item.quantity,
+        rate: item.price,
+        amount: parseFloat(item.amount),
+      }));
+
+      // Insert into 'bills' table (correct table name)
+      const billData = {
+        id: `bill-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // ✅ Generate unique ID
+        user_id: user.id,
+        bill_number: billNumber,
+        template: selectedTemplate,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        customer_email: customerEmail || null,
+        customer_gst: customerGST || null,
+        customer_address: customerAddress || null,
+        bill_date: billDate,
+        due_date: dueDate,
+        business_name: businessName,
+        business_address: businessAddress,
+        business_gst: businessGST || null,
+        business_phone: businessPhone,
+        business_email: businessEmail || null,
+        gst_type: gstType,
+        include_gst: gstRate > 0,
+        gst_rate: gstRate,
+        items: itemsData, // Store as JSONB
+        subtotal: calculations.subtotal,
+        gst_amount: calculations.gstAmount,
+        total: calculations.total,
+        notes: notes || null,
+        terms_and_conditions: termsAndConditions || null,
+        payment_instructions: paymentInstructions || null,
+        status: 'draft',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        synced_at: new Date().toISOString(),
+        deleted_at: null,
+        device_id: null, // ✅ Add device_id field
+      };
+
+      console.log('🚀 Creating invoice in bills table:', billData);
+
+      const { data: invoice, error: invoiceError } = await (supabase as any)
+        .from('bills')
+        .insert(billData)
         .select()
         .single();
       
-      if (invoiceError) throw invoiceError;
+      if (invoiceError) {
+        console.error('❌ Error creating invoice:', invoiceError);
+        throw invoiceError;
+      }
       
-      const itemsToInsert = items.map((item, index) => ({
-        invoice_id: invoice.id,
-        item_name: item.name,
-        description: item.description,
-        hsn_code: item.hsn,
-        quantity: parseFloat(item.quantity),
-        unit_price: parseFloat(item.price),
-        discount_percentage: parseFloat(item.discount),
-        line_total: parseFloat(item.amount),
-        sort_order: index
-      }));
-      
-      const { error: itemsError } = await supabase
-        .from('invoice_items')
-        .insert(itemsToInsert);
-      
-      if (itemsError) throw itemsError;
+      console.log('✅ Invoice created successfully:', invoice);
       
       toast.success("Invoice Created!", {
         description: `${billNumber} for ${currency.symbol}${calculations.total.toFixed(2)}`
       });
       
       onOpenChange(false);
-      onSuccess?.();
+      onSuccess?.(invoice); // Pass the created invoice to parent
     } catch (error: any) {
+      console.error('❌ Failed to save invoice:', error);
       toast.error("Failed to Save", { description: error.message });
     } finally {
       setIsSaving(false);

@@ -60,6 +60,9 @@ export default function Suppliers() {
         note: t.description || undefined,
       }));
 
+      // Database 'amount' field already contains CURRENT BALANCE
+      const currentBalance = ss.amount || 0;
+
       return {
         id: ss.id,
         name: ss.name,
@@ -67,10 +70,10 @@ export default function Suppliers() {
         email: ss.email || undefined,
         address: ss.address || undefined,
         gstNumber: ss.gst_number || undefined,
-        openingBalance: ss.amount ? Math.abs(ss.amount).toString() : "0",
-        balanceType: ss.amount >= 0 ? "credit" : "debit",
+        openingBalance: Math.abs(currentBalance).toString(),
+        balanceType: currentBalance >= 0 ? "credit" : "debit",
         createdAt: new Date(ss.created_at),
-        transactions: transformedTransactions, // ✅ NOW INCLUDING TRANSACTIONS!
+        transactions: transformedTransactions,
       };
     });
   }, [supabaseSuppliers]);
@@ -100,45 +103,74 @@ export default function Suppliers() {
   const handleTransactionAdded = async (transactionData: any) => {
     if (!selectedSupplier) return;
 
-    const currentBalance = parseFloat(selectedSupplier.openingBalance || "0");
-    const transactionAmount = parseFloat(transactionData.amount);
+    console.log('⚡ Transaction added, updating UI INSTANTLY...', transactionData);
     
-    let newBalance = currentBalance;
-    if (transactionData.type === "got") {
-      if (selectedSupplier.balanceType === "credit") {
-        newBalance = currentBalance - transactionAmount;
-      } else {
-        newBalance = currentBalance + transactionAmount;
-      }
-    } else {
-      if (selectedSupplier.balanceType === "credit") {
-        newBalance = currentBalance + transactionAmount;
-      } else {
-        newBalance = currentBalance - transactionAmount;
-      }
-    }
-
+    // Create the new transaction object
     const newTransaction: Transaction = {
-      id: Date.now().toString(),
-      date: new Date(transactionData.date),
-      type: transactionData.type,
-      amount: transactionAmount,
-      balance: newBalance,
-      note: transactionData.description || undefined,
+      id: transactionData.id,
+      date: transactionData.date,
+      type: transactionData.type === 'received' ? 'got' : 'gave',
+      amount: parseFloat(transactionData.amount || transactionData.amount),
+      balance: parseFloat(selectedSupplier.openingBalance || "0"),
+      note: transactionData.description,
     };
 
-    const updatedSupplier = {
-      ...selectedSupplier,
-      openingBalance: Math.abs(newBalance).toString(),
-      balanceType: newBalance >= 0 ? selectedSupplier.balanceType : (selectedSupplier.balanceType === "credit" ? "debit" : "credit"),
-      transactions: [newTransaction, ...(selectedSupplier.transactions || [])],
-    };
-
-    // Update selected supplier locally
-    setSelectedSupplier(updatedSupplier);
+    // IMMEDIATELY update UI (optimistic update)
+    setSelectedSupplier(prevSupplier => {
+      if (!prevSupplier) return null;
+      return {
+        ...prevSupplier,
+        transactions: [newTransaction, ...(prevSupplier.transactions || [])],
+      };
+    });
     
-    // Refetch to get updated data from server
-    await refetch();
+    console.log('✅ UI updated instantly');
+    
+    // Background sync with SMART MERGE (don't replace, merge!)
+    setTimeout(() => {
+      refetch().then(() => {
+        if (supabaseSuppliers) {
+          const serverSupplier = supabaseSuppliers.find((s: any) => s.id === selectedSupplier.id);
+          if (serverSupplier) {
+            const serverTransactions = serverSupplier.transactions?.map((t: any) => ({
+              id: t.id,
+              date: t.date,
+              type: t.type === 'received' ? 'got' : 'gave',
+              amount: parseFloat(t.amount),
+              balance: parseFloat(t.amount),
+              note: t.description,
+            })) || [];
+            
+            // SMART MERGE: Keep optimistic transaction if not yet on server
+            setSelectedSupplier(prev => {
+              if (!prev) return null;
+              
+              const optimisticIds = prev.transactions?.map(t => t.id) || [];
+              const serverIds = serverTransactions.map(t => t.id);
+              
+              // Keep optimistic transactions not yet confirmed by server
+              const optimisticOnly = prev.transactions?.filter(t => !serverIds.includes(t.id)) || [];
+              
+              console.log('🔄 Merge: Optimistic only:', optimisticOnly.length, 'Server:', serverTransactions.length);
+              
+              return {
+                id: serverSupplier.id,
+                name: serverSupplier.name,
+                phone: serverSupplier.phone,
+                email: serverSupplier.email,
+                address: serverSupplier.address,
+                gstNumber: serverSupplier.gst_number,
+                openingBalance: serverSupplier.amount?.toString() || "0",
+                balanceType: parseFloat(serverSupplier.amount || 0) >= 0 ? "credit" : "debit",
+                createdAt: serverSupplier.created_at,
+                // Merge: optimistic transactions + server transactions (deduplicated)
+                transactions: [...optimisticOnly, ...serverTransactions],
+              };
+            });
+          }
+        }
+      });
+    }, 500); // 500ms delay for DB commit
   };
 
   // Calculate totals
@@ -149,10 +181,12 @@ export default function Suppliers() {
     suppliers.forEach(supplier => {
       const balance = parseFloat(supplier.openingBalance || "0");
       if (balance > 0) {
-        if (supplier.balanceType === "debit") {
-          youllGive += balance;
-        } else {
+        // balanceType "credit" = positive balance = you'll GET (they owe you)
+        // balanceType "debit" = negative balance = you'll GIVE (you owe them)
+        if (supplier.balanceType === "credit") {
           youllGet += balance;
+        } else {
+          youllGive += balance;
         }
       }
     });
@@ -433,6 +467,7 @@ export default function Suppliers() {
       />
 
       <SupplierDetailPanel
+        key={`${selectedSupplier?.id}-${selectedSupplier?.transactions?.length || 0}`}
         supplier={selectedSupplier}
         isOpen={isPanelOpen}
         onClose={handleClosePanel}

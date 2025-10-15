@@ -397,10 +397,16 @@ class UserDataService {
         const customerTransactions = (transactionsData || []).filter(
           t => t.customer_id === customer.id
         );
+
+        const normalizedTransactions = customerTransactions.map(transaction => ({
+          ...transaction,
+          type: transaction.type === 'received' ? 'got' : 'gave',
+          amount: Number(transaction.amount) || 0,
+        }));
         
         return {
           ...customer,
-          transactions: customerTransactions
+          transactions: normalizedTransactions,
         };
       });
 

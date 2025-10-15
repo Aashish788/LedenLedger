@@ -91,10 +91,16 @@ const Login = () => {
     try {
       setIsGoogleLoading(true);
       
+      // Ensure proper URL formatting without double slashes
+      const origin = window.location.origin.replace(/\/$/, ''); // Remove trailing slash if exists
+      const redirectUrl = `${origin}/login`;
+      
+      console.log('Redirect URL:', redirectUrl); // Debug log
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/login`,
+          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account',
