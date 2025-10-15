@@ -40,6 +40,15 @@ async function generateFavicons() {
     .toFile('public/apple-touch-icon.png');
   console.log('✓ Generated apple-touch-icon.png');
 
+  // Generate favicon.ico (32x32 - best for browser tabs)
+  await sharp(inputFile)
+    .resize(32, 32, {
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    })
+    .toFile('public/favicon.ico');
+  console.log('✓ Generated favicon.ico');
+
   console.log('\n✓ All favicons generated successfully!');
 }
 
