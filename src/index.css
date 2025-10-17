@@ -176,4 +176,46 @@ All colors MUST be HSL.
   .bg-gradient-accent {
     background: var(--gradient-accent);
   }
+
+  /* Mobile-friendly utilities */
+  .btn-mobile {
+    @apply min-h-[44px] px-4 text-sm sm:text-base touch-manipulation;
+  }
+  
+  .text-mobile {
+    @apply text-sm sm:text-base;
+  }
+  
+  .text-mobile-lg {
+    @apply text-base sm:text-lg;
+  }
+  
+  .text-mobile-xl {
+    @apply text-lg sm:text-xl md:text-2xl;
+  }
+  
+  /* Safe grid columns for tables on mobile */
+  .grid-table-mobile {
+    @apply grid grid-cols-[1fr_60px_60px] sm:grid-cols-[1fr_80px_80px] gap-2 sm:gap-3;
+  }
+  
+  .grid-table-mobile-2 {
+    @apply grid grid-cols-2 gap-2 sm:gap-4;
+  }
+  
+  /* Horizontal scroll container for mobile */
+  .scroll-container-mobile {
+    @apply overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin;
+  }
+  
+  /* Touch-friendly spacing */
+  .touch-spacing {
+    @apply p-3 sm:p-4 md:p-6;
+  }
+  
+  /* Responsive card padding */
+  .card-mobile {
+    @apply p-3 sm:p-4 md:p-5;
+  }
 }
+

@@ -105,19 +105,19 @@ export default function Reports() {
     <DashboardLayout>
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <div className="bg-card border-b border-border px-6 py-5">
-          <div className="flex items-center justify-between">
+        <div className="bg-card border-b border-border px-4 sm:px-6 py-4 sm:py-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center">
-                <ArrowLeftRight className="h-6 w-6 text-white" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-blue-600 flex items-center justify-center">
+                <ArrowLeftRight className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-foreground">Transactions Reports</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Transactions Reports</h1>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
               <Button
                 variant="outline"
                 onClick={handleDownloadPDF}
-                className="border-border hover:bg-accent"
+                className="border-border hover:bg-accent w-full sm:w-auto"
               >
                 <FileDown className="h-4 w-4 mr-2" />
                 Download PDF
@@ -125,7 +125,7 @@ export default function Reports() {
               <Button
                 variant="outline"
                 onClick={handleDownloadExcel}
-                className="border-border hover:bg-accent"
+                className="border-border hover:bg-accent w-full sm:w-auto"
               >
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Download Excel
@@ -134,33 +134,33 @@ export default function Reports() {
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Tabs */}
-          <div className="flex gap-6 mb-6 border-b border-border">
+          <div className="flex gap-3 sm:gap-6 mb-6 border-b border-border overflow-x-auto">
             <button
               onClick={() => setActiveTab("customers")}
-              className={`pb-3 px-1 font-medium transition-colors relative ${
+              className={`pb-3 px-1 font-medium transition-colors relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === "customers"
                   ? "text-blue-600"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Customers
-              <span className="ml-2 text-sm bg-blue-600/10 text-blue-600 px-2 py-0.5 rounded-full">{customerCount}</span>
+              <span className="ml-1 sm:ml-2 text-xs sm:text-sm bg-blue-600/10 text-blue-600 px-1.5 sm:px-2 py-0.5 rounded-full">{customerCount}</span>
               {activeTab === "customers" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
               )}
             </button>
             <button
               onClick={() => setActiveTab("suppliers")}
-              className={`pb-3 px-1 font-medium transition-colors relative ${
+              className={`pb-3 px-1 font-medium transition-colors relative whitespace-nowrap text-sm sm:text-base ${
                 activeTab === "suppliers"
                   ? "text-blue-600"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Suppliers
-              <span className="ml-2 text-sm bg-blue-600/10 text-blue-600 px-2 py-0.5 rounded-full">{supplierCount}</span>
+              <span className="ml-1 sm:ml-2 text-xs sm:text-sm bg-blue-600/10 text-blue-600 px-1.5 sm:px-2 py-0.5 rounded-full">{supplierCount}</span>
               {activeTab === "suppliers" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
               )}

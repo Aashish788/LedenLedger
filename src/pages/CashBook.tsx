@@ -204,14 +204,14 @@ export default function CashBook() {
     <DashboardLayout>
       <div className="max-w-4xl mx-auto pb-28 relative">
         <div className="bg-background border-b sticky top-0 z-10 px-4 py-3">
-          <h1 className="text-lg font-bold text-foreground">Cashbook</h1>
+          <h1 className="text-base sm:text-lg font-bold text-foreground">Cashbook</h1>
         </div>
 
         <div className="px-4 py-3 bg-background border-b">
           <div className="flex items-center justify-between mb-2.5">
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">Total Balance</p>
-              <p className={`text-2xl font-bold ${
+              <p className={`text-xl sm:text-2xl font-bold ${
                 totals.balance >= 0 
                   ? "text-green-600 dark:text-green-500" 
                   : "text-red-600 dark:text-red-500"
@@ -221,12 +221,13 @@ export default function CashBook() {
             </div>
             <Button variant="outline" size="sm" className="gap-1.5 border-primary text-primary hover:bg-primary/10 h-8 text-xs">
               <Receipt className="h-3.5 w-3.5" />
-              View Report
+              <span className="hidden sm:inline">View Report</span>
+              <span className="sm:hidden">Report</span>
             </Button>
           </div>
           <div className="flex items-center justify-between pt-2.5 border-t">
             <p className="text-xs text-muted-foreground">Todays Balance</p>
-            <p className={`text-base font-semibold ${
+            <p className={`text-sm sm:text-base font-semibold ${
               (dailyTotals.dailyCashIn - dailyTotals.dailyCashOut) >= 0 
                 ? "text-green-600 dark:text-green-500" 
                 : "text-red-600 dark:text-red-500"
@@ -287,7 +288,7 @@ export default function CashBook() {
         ) : (
           <div className="bg-muted/30">
             <div className="px-4 py-2.5 bg-background border-b">
-              <div className="grid grid-cols-[1fr_70px_70px] gap-3 text-xs font-semibold text-muted-foreground">
+              <div className="grid grid-cols-[1fr_60px_60px] sm:grid-cols-[1fr_80px_80px] gap-2 sm:gap-3 text-xs sm:text-sm font-semibold text-muted-foreground">
                 <div>NAME</div>
                 <div className="text-right">OUT</div>
                 <div className="text-right">IN</div>
@@ -299,13 +300,13 @@ export default function CashBook() {
               return (
                 <div key={date}>
                   <div className="px-4 py-2.5 bg-background border-b">
-                    <div className="grid grid-cols-[1fr_70px_70px] gap-3">
+                    <div className="grid grid-cols-[1fr_60px_60px] sm:grid-cols-[1fr_80px_80px] gap-2 sm:gap-3">
                       <div>
-                        <p className="text-xs font-semibold text-foreground mb-0.5">{formatDateLabel(date)}</p>
+                        <p className="text-xs sm:text-sm font-semibold text-foreground mb-0.5">{formatDateLabel(date)}</p>
                         <p className="text-[10px] text-muted-foreground">{dateEntries.length} {dateEntries.length === 1 ? 'Entry' : 'Entries'}</p>
                       </div>
-                                            <div className="text-right text-xs font-bold text-red-600 dark:text-red-500">₹{dayOut.toLocaleString('en-IN')}</div>
-                      <div className="text-right text-xs font-bold text-green-600 dark:text-green-500">₹{dayIn.toLocaleString('en-IN')}</div>
+                                            <div className="text-right text-xs sm:text-sm font-bold text-red-600 dark:text-red-500">₹{dayOut.toLocaleString('en-IN')}</div>
+                      <div className="text-right text-xs sm:text-sm font-bold text-green-600 dark:text-green-500">₹{dayIn.toLocaleString('en-IN')}</div>
                     </div>
                   </div>
                   {dateEntries.map((entry, index) => (
@@ -314,7 +315,7 @@ export default function CashBook() {
                       className={`px-4 py-3 bg-background ${index !== dateEntries.length - 1 ? 'border-b' : ''} hover:bg-accent/50 transition-colors cursor-pointer`}
                       onClick={() => handleTransactionClick(entry)}
                     >
-                      <div className="grid grid-cols-[1fr_70px_70px] gap-3 items-start">
+                      <div className="grid grid-cols-[1fr_60px_60px] sm:grid-cols-[1fr_80px_80px] gap-2 sm:gap-3 items-start">
                         <div className="flex items-start gap-2.5">
                           <div className={`p-2 rounded-lg flex-shrink-0 ${entry.type === "cash_in" ? "bg-green-100 dark:bg-green-950/30" : "bg-yellow-100 dark:bg-yellow-950/30"}`}>
                             <Receipt className={`h-4 w-4 ${entry.type === "cash_in" ? "text-green-600 dark:text-green-500" : "text-yellow-600 dark:text-yellow-500"}`} />
@@ -331,18 +332,18 @@ export default function CashBook() {
                         </div>
                         <div className="text-right">
                           {entry.type === "cash_out" && (
-                            <p className="text-sm font-semibold text-red-600 dark:text-red-500">₹{parseFloat(entry.amount).toLocaleString('en-IN')}</p>
+                            <p className="text-xs sm:text-sm font-semibold text-red-600 dark:text-red-500">₹{parseFloat(entry.amount).toLocaleString('en-IN')}</p>
                           )}
                           {entry.type === "cash_in" && (
-                            <p className="text-sm text-muted-foreground">-</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground">-</p>
                           )}
                         </div>
                         <div className="text-right">
                           {entry.type === "cash_in" && (
-                            <p className="text-sm font-semibold text-green-600 dark:text-green-500">₹{parseFloat(entry.amount).toLocaleString('en-IN')}</p>
+                            <p className="text-xs sm:text-sm font-semibold text-green-600 dark:text-green-500">₹{parseFloat(entry.amount).toLocaleString('en-IN')}</p>
                           )}
                           {entry.type === "cash_out" && (
-                            <p className="text-sm text-muted-foreground">-</p>
+                            <p className="text-xs sm:text-sm text-muted-foreground">-</p>
                           )}
                         </div>
                       </div>

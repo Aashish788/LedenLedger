@@ -11,10 +11,10 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-4xl mx-auto space-y-8 px-4 sm:px-6 py-6 sm:py-8">
         {/* Header Section */}
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold text-foreground">Good morning, User</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Good morning, User</h1>
           <p className="text-sm text-muted-foreground">{currentDate}</p>
         </div>
 
@@ -44,7 +44,7 @@ export default function Dashboard() {
         {/* Recent Activity */}
         <div className="space-y-4">
           <h2 className="section-label">Recent Activity</h2>
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="action-card">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
@@ -67,7 +67,7 @@ export default function Dashboard() {
         {/* Quick Actions */}
         <div className="space-y-4">
           <h2 className="section-label">Quick Actions</h2>
-          <div className="grid gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div className="action-card">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
@@ -96,19 +96,19 @@ export default function Dashboard() {
         </div>
 
         {/* Keyboard Shortcuts Hint */}
-        <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground pt-4">
+        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs text-muted-foreground pt-4">
           <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 rounded bg-muted border border-border">↑</kbd>
-            <kbd className="px-2 py-1 rounded bg-muted border border-border">↓</kbd>
-            <span>to navigate</span>
+            <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] sm:text-xs">↑</kbd>
+            <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] sm:text-xs">↓</kbd>
+            <span className="text-[10px] sm:text-xs">to navigate</span>
           </div>
           <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 rounded bg-muted border border-border">↵</kbd>
-            <span>to select</span>
+            <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] sm:text-xs">↵</kbd>
+            <span className="text-[10px] sm:text-xs">to select</span>
           </div>
           <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 rounded bg-muted border border-border">esc</kbd>
-            <span>to close</span>
+            <kbd className="px-2 py-1 rounded bg-muted border border-border text-[10px] sm:text-xs">esc</kbd>
+            <span className="text-[10px] sm:text-xs">to close</span>
           </div>
         </div>
       </div>

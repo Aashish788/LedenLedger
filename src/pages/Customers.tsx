@@ -254,25 +254,25 @@ export default function Customers() {
 
   return (
     <DashboardLayout>
-      <div className={`max-w-6xl mx-auto transition-all duration-300 ease-in-out ${
+      <div className={`max-w-6xl mx-auto px-4 sm:px-6 transition-all duration-300 ease-in-out ${
         isPanelOpen ? "md:mr-[520px] md:max-w-3xl" : ""
       }`}>
         {/* Tabs with View Report Button */}
-        <div className="flex items-center justify-between border-b border-border">
+        <div className="flex items-center justify-between border-b border-border overflow-x-auto">
           <Tabs defaultValue="customers" className="flex-1">
-            <TabsList className="justify-start border-0 rounded-none h-12 bg-transparent p-0">
+            <TabsList className="justify-start border-0 rounded-none h-10 sm:h-12 bg-transparent p-0">
               <TabsTrigger 
                 value="customers" 
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 sm:px-6 text-sm sm:text-base"
               >
-                Customers <span className="ml-2 text-primary font-semibold">{customers.length}</span>
+                Customers <span className="ml-1 sm:ml-2 text-primary font-semibold">{customers.length}</span>
               </TabsTrigger>
               <TabsTrigger 
                 value="suppliers"
                 onClick={() => navigate('/suppliers')}
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-3 sm:px-6 text-sm sm:text-base"
               >
-                Suppliers <span className="ml-2 text-muted-foreground">0</span>
+                Suppliers <span className="ml-1 sm:ml-2 text-muted-foreground">0</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
