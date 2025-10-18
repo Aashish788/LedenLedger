@@ -262,8 +262,42 @@ interface ServiceResponse<T> {
 }
 
 // ============================================================================
+// ============================================================================
 // CORE SERVICE CLASS
 // ============================================================================
+
+/**
+ * Timeout configuration
+ */
+const TIMEOUT_CONFIG = {
+  default: 30000,      // 30 seconds
+  critical: 15000,     // 15 seconds (auth, etc)
+  background: 60000,   // 60 seconds (analytics, etc)
+};
+
+/**
+ * Create a timeout promise that rejects after specified milliseconds
+ */
+function createTimeoutPromise(ms: number): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(`Request timeout after ${ms}ms`));
+    }, ms);
+  });
+}
+
+/**
+ * Wrap a promise with timeout protection
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number = TIMEOUT_CONFIG.default
+): Promise<T> {
+  return Promise.race([
+    promise,
+    createTimeoutPromise(timeoutMs)
+  ]);
+}
 
 /**
  * UserDataService Class
@@ -272,6 +306,8 @@ interface ServiceResponse<T> {
  */
 class UserDataService {
   private static instance: UserDataService;
+  private requestCache: Map<string, { data: any; timestamp: number }> = new Map();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   private constructor() {}
 
@@ -286,12 +322,47 @@ class UserDataService {
   }
 
   /**
+   * Check if cached data is still valid
+   */
+  private isCacheValid(key: string): boolean {
+    const cached = this.requestCache.get(key);
+    if (!cached) return false;
+    
+    const age = Date.now() - cached.timestamp;
+    return age < this.CACHE_TTL;
+  }
+
+  /**
+   * Get cached data if valid
+   */
+  private getCachedData(key: string): any | null {
+    if (this.isCacheValid(key)) {
+      console.log(`[UserDataService] 📦 Using cached data for ${key}`);
+      return this.requestCache.get(key)!.data;
+    }
+    return null;
+  }
+
+  /**
+   * Cache data with timestamp
+   */
+  private setCachedData(key: string, data: any): void {
+    this.requestCache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
    * Validate user authentication
    * @private
    */
   private async validateUser(): Promise<string | null> {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await withTimeout(
+        supabase.auth.getSession(),
+        TIMEOUT_CONFIG.critical
+      );
       
       if (error) {
         console.error('[UserDataService] Authentication error:', error);
@@ -316,15 +387,28 @@ class UserDataService {
    */
   private async fetchUserProfile(userId: string): Promise<ServiceResponse<UserProfile>> {
     try {
-      const { data, error } = await (supabase as any)
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      const cacheKey = `profile_${userId}`;
+      const cached = this.getCachedData(cacheKey);
+      if (cached) return { data: cached, error: null };
+
+      const result: any = await withTimeout(
+        (supabase as any)
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle(),
+        TIMEOUT_CONFIG.default
+      );
+
+      const { data, error } = result;
 
       if (error) {
         console.error('[UserDataService] Profile fetch error:', error);
         return { data: null, error: error.message };
+      }
+
+      if (data) {
+        this.setCachedData(cacheKey, data);
       }
 
       return { data, error: null };
@@ -341,15 +425,28 @@ class UserDataService {
    */
   private async fetchBusinessSettings(userId: string): Promise<ServiceResponse<BusinessSettings>> {
     try {
-      const { data, error } = await (supabase as any)
-        .from('business_settings')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+      const cacheKey = `business_${userId}`;
+      const cached = this.getCachedData(cacheKey);
+      if (cached) return { data: cached, error: null };
+
+      const result: any = await withTimeout(
+        (supabase as any)
+          .from('business_settings')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle(),
+        TIMEOUT_CONFIG.default
+      );
+
+      const { data, error } = result;
 
       if (error) {
         console.error('[UserDataService] Business settings fetch error:', error);
         return { data: null, error: error.message };
+      }
+
+      if (data) {
+        this.setCachedData(cacheKey, data);
       }
 
       return { data, error: null };

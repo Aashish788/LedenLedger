@@ -6,7 +6,7 @@
  * @version 1.0.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { userDataService, type UserDataResponse } from '@/services/api/userDataService';
 
 /**
@@ -48,11 +48,29 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
   const [isLoading, setIsLoading] = useState(autoFetch);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use ref to track if component is mounted (prevent memory leaks)
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
-   * Fetch user data
+   * Fetch user data with timeout protection
    */
   const fetchData = useCallback(async (isRefresh: boolean = false) => {
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    
     try {
       if (isRefresh) {
         setIsRefreshing(true);
@@ -62,23 +80,56 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
       
       setError(null);
 
-      const response = await userDataService.fetchAllUserData();
+      // Create a timeout promise (30 seconds)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutRef.current = setTimeout(() => {
+          reject(new Error('Request timeout - please check your connection and try again'));
+        }, 30000); // 30 second timeout
+      });
+
+      // Race between fetch and timeout
+      const response = await Promise.race([
+        userDataService.fetchAllUserData(),
+        timeoutPromise
+      ]);
+
+      // Clear timeout if request completed
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
 
       if (response.success) {
         setUserData(response);
         setError(null);
       } else {
         setError(response.error || 'Failed to fetch user data');
+        console.error('[useUserData] Fetch failed:', response.error);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+      
+      // Handle abort errors silently (they're intentional)
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('[useUserData] Request cancelled');
+        return;
+      }
+
+      const message = err instanceof Error ? err.message : 'Unknown error occurred. Please try again.';
       setError(message);
       console.error('[useUserData] Error fetching data:', err);
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      // Only update loading state if component is still mounted
+      if (isMountedRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  }, []);
+  }, []); // Empty dependency array - function is stable
 
   /**
    * Refresh data (with refresh flag)
@@ -99,7 +150,22 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
     if (autoFetch) {
       fetchData();
     }
-  }, [autoFetch, fetchData]);
+
+    // Cleanup function
+    return () => {
+      isMountedRef.current = false;
+      
+      // Cancel any pending request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Clear any pending timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [autoFetch]); // Remove fetchData from dependencies to prevent infinite loop
 
   return {
     userData,
@@ -141,37 +207,106 @@ export function useSpecificData<T = any>(
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(autoFetch);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use ref to track if component is mounted (prevent memory leaks)
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchData = useCallback(async () => {
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await userDataService.fetchSpecificData(dataType);
+      // Create a timeout promise (30 seconds)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutRef.current = setTimeout(() => {
+          reject(new Error('Request timeout - please check your connection and try again'));
+        }, 30000); // 30 second timeout
+      });
+
+      // Race between fetch and timeout
+      const response = await Promise.race([
+        userDataService.fetchSpecificData(dataType),
+        timeoutPromise
+      ]);
+
+      // Clear timeout if request completed
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
 
       if (response.error) {
         setError(response.error);
+        setData(null);
       } else {
         setData(response.data as T);
+        setError(null);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+      
+      // Handle abort errors silently (they're intentional)
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log(`[useSpecificData] Request cancelled for ${dataType}`);
+        return;
+      }
+
+      const message = err instanceof Error ? err.message : 'Unknown error occurred. Please try again.';
       setError(message);
+      setData(null);
       console.error(`[useSpecificData] Error fetching ${dataType}:`, err);
     } finally {
-      setIsLoading(false);
+      // Only update loading state if component is still mounted
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [dataType]);
+  }, [dataType]); // Only depend on dataType, not on state
 
   const refetch = useCallback(async () => {
     await fetchData();
   }, [fetchData]);
 
+  // Fetch data on mount or when dataType changes
   useEffect(() => {
     if (autoFetch) {
       fetchData();
     }
-  }, [autoFetch, fetchData]);
+
+    // Cleanup function
+    return () => {
+      isMountedRef.current = false;
+      
+      // Cancel any pending request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Clear any pending timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [dataType, autoFetch]); // Remove fetchData from dependencies to prevent infinite loop
 
   return {
     data,
