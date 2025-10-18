@@ -43,7 +43,7 @@ export function ProtectedRoute({
   fallbackPath = '/login',
   permissions = []
 }: ProtectedRouteProps) {
-  const { user, isAuthenticated, isLoading, checkSession } = useAuth();
+  const { user, isAuthenticated, isLoading, isInitialized, checkSession } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [isValidating, setIsValidating] = useState(false);
@@ -120,7 +120,24 @@ export function ProtectedRoute({
   }, [location.pathname, user, isAuthenticated, requireAdmin, permissions]);
 
   // ============================================================================
-  // LOADING STATE - Show during initial authentication check
+  // INITIALIZATION STATE - Show during first-time app load
+  // ============================================================================
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="text-center">
+            <p className="text-sm font-medium text-foreground">Initializing...</p>
+            <p className="text-xs text-muted-foreground mt-1">Setting up your session</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // LOADING STATE - Show during authentication operations (login, etc.)
   // ============================================================================
   if (isLoading && !user) {
     return (
@@ -274,12 +291,25 @@ export function PublicOnlyRoute({
   children, 
   redirectPath = '/dashboard' 
 }: PublicOnlyRouteProps) {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, isInitialized, user } = useAuth();
   const location = useLocation();
   
   /**
    * Show loading only during initial authentication check
    */
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <div className="text-center">
+            <p className="text-sm font-medium text-foreground">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

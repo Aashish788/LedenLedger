@@ -125,19 +125,11 @@ export function SupplierDetailPanel({ supplier, isOpen, onClose, onTransactionAd
     onTransactionAdded?.(transactionData);
   };
 
-  const calculateNetBalance = () => {
-    let total = balance;
-    transactions.forEach(t => {
-      if (t.type === "gave") {
-        total += t.amount;
-      } else {
-        total -= t.amount;
-      }
-    });
-    return total;
-  };
-
-  const netBalance = calculateNetBalance();
+  // INDUSTRY-GRADE SOLUTION: Trust the database as single source of truth
+  // The openingBalance field contains the CURRENT net balance, not the initial balance
+  // The database maintains this value through triggers/stored procedures
+  // We should NOT recalculate by looping through transactions (that causes double-counting)
+  const netBalance = balance;
 
   const handleWhatsAppReminder = () => {
     // Clean phone number (remove spaces, dashes, brackets, etc.)
