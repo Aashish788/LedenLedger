@@ -20,10 +20,10 @@
  * ============================================================================
  */
 
-import { ReactNode, useEffect, useCallback } from 'react';
+import { ReactNode, useEffect, useState, useCallback } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, ShieldAlert } from 'lucide-react';
+import { Loader2, ShieldAlert, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ProtectedRouteProps {
@@ -43,9 +43,64 @@ export function ProtectedRoute({
   fallbackPath = '/login',
   permissions = []
 }: ProtectedRouteProps) {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, checkSession } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  /**
+   * Session validation on route mount and change
+   * Validates authentication state without blocking UI
+   */
+  const validateSession = useCallback(async () => {
+    // Skip validation if already loading or no user
+    if (isLoading || !user) return;
+
+    try {
+      setIsValidating(true);
+      setValidationError(null);
+      
+      // Re-validate session in background
+      await checkSession();
+      
+      // Log successful validation
+      console.log('✅ Route protection: Session validated', {
+        route: location.pathname,
+        user: user.email,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Route protection: Session validation failed', error);
+      setValidationError('Session validation failed');
+      
+      // Show user-friendly error
+      toast.error('Session expired', {
+        description: 'Please login again to continue',
+        duration: 5000
+      });
+      
+      // Redirect to login after a brief delay
+      setTimeout(() => {
+        navigate(fallbackPath, { 
+          state: { from: location.pathname },
+          replace: true 
+        });
+      }, 2000);
+    } finally {
+      setIsValidating(false);
+    }
+  }, [user, isLoading, checkSession, location.pathname, navigate, fallbackPath]);
+
+  /**
+   * Run session validation on route change
+   * Ensures fresh auth state for each protected route
+   */
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      validateSession();
+    }
+  }, [location.pathname]); // Re-validate on route change
 
   /**
    * Security: Track route access for audit logs
@@ -76,6 +131,28 @@ export function ProtectedRoute({
             <p className="text-sm font-medium text-foreground">Verifying authentication...</p>
             <p className="text-xs text-muted-foreground mt-1">Please wait</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // VALIDATION ERROR STATE - Show if session validation failed
+  // ============================================================================
+  if (validationError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="max-w-md mx-auto text-center p-6">
+          <div className="mb-4">
+            <div className="h-16 w-16 mx-auto bg-destructive/10 rounded-full flex items-center justify-center">
+              <AlertTriangle className="h-8 w-8 text-destructive" />
+            </div>
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Session Expired</h2>
+          <p className="text-muted-foreground mb-6">
+            Your session has expired. Redirecting to login...
+          </p>
+          <Loader2 className="h-5 w-5 animate-spin mx-auto text-primary" />
         </div>
       </div>
     );
@@ -158,6 +235,14 @@ export function ProtectedRoute({
     // TODO: Implement fine-grained permission checking
     // Example: Check if user has specific permissions like 'can_edit_customers'
     console.log('🔐 Permission check:', { required: permissions, user: user.email });
+  }
+
+  // ============================================================================
+  // BACKGROUND VALIDATION INDICATOR (Optional)
+  // ============================================================================
+  // Show subtle indicator when validating session in background
+  if (isValidating) {
+    console.log('🔄 Background session validation in progress...');
   }
 
   // ============================================================================

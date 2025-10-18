@@ -35,14 +35,11 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start with true to prevent flash
-  const [isInitialized, setIsInitialized] = useState(false);
+  // Initialize with cached state for instant loading (like Gmail)
+  const cachedState = authCache.get();
+  const [user, setUser] = useState<User | null>(cachedState?.user || null);
+  const [isLoading, setIsLoading] = useState(false); // Start with false for optimistic loading
   const [csrfToken, setCsrfToken] = useState(generateCSRFToken());
-  
-  // Track if we're currently validating to prevent race conditions
-  const isValidatingRef = React.useRef(false);
-  const initStartedRef = React.useRef(false);
 
   // Generate new CSRF token periodically
   useEffect(() => {
@@ -53,101 +50,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  // INDUSTRY-GRADE: Single initialization with proper coordination
+  // Professional initialization - check session in background only if needed
   useEffect(() => {
-    // Prevent double initialization in React 18 Strict Mode
-    if (initStartedRef.current) return;
-    initStartedRef.current = true;
-
-    let mounted = true;
-    let authSubscription: any = null;
-
+    // If we have cached auth, validate in background (non-blocking)
     const initAuth = async () => {
-      try {
-        console.log('🔐 Auth initialization started');
-        
-        // Check for cached state first (instant UI)
-        const cachedState = authCache.get();
-        if (cachedState?.isAuthenticated && cachedState.user) {
-          console.log('✅ Using cached auth state');
-          setUser(cachedState.user);
-          setIsLoading(false);
-          // Still validate in background but don't block UI
-        }
-
-        // Always validate actual session on mount
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (!mounted) return;
-
-        if (error) {
-          console.error('❌ Session check error:', error);
-          handleSignOut();
-          setIsLoading(false);
-          setIsInitialized(true);
-          return;
-        }
-
-        if (session?.user) {
-          console.log('✅ Valid session found');
-          await loadUserProfile(session.user, false);
-          authCache.markSessionChecked();
-        } else {
-          console.log('ℹ️ No active session');
-          handleSignOut();
-        }
-
-        setIsLoading(false);
-        setIsInitialized(true);
-        console.log('🔐 Auth initialization complete');
-
-      } catch (error) {
-        console.error('❌ Auth initialization failed:', error);
-        if (mounted) {
-          handleSignOut();
-          setIsLoading(false);
-          setIsInitialized(true);
-        }
+      if (cachedState?.isAuthenticated) {
+        // User sees UI immediately, we validate in background
+        validateSessionInBackground();
+      } else {
+        // No cache, check session (but only once on mount)
+        await checkSession();
       }
     };
 
-    // Start initialization
     initAuth();
     
-    // Set up auth state listener AFTER initialization
-    const setupAuthListener = async () => {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (!mounted) return;
-        
-        console.log('🔄 Auth state changed:', event);
-        
-        // Ignore INITIAL_SESSION as we handle it in initAuth
-        if (event === 'INITIAL_SESSION') {
-          return;
-        }
-        
-        if (event === 'SIGNED_IN' && session) {
-          await loadUserProfile(session.user, false);
-        } else if (event === 'SIGNED_OUT') {
-          handleSignOut();
-        } else if (event === 'TOKEN_REFRESHED' && session) {
-          // Silent refresh - update cache without showing loading
-          await loadUserProfile(session.user, false);
-        } else if (event === 'USER_UPDATED' && session) {
-          await loadUserProfile(session.user, false);
-        }
-      });
+    // Listen for auth state changes (token refresh, logout, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event);
       
-      authSubscription = subscription;
-    };
-
-    setupAuthListener();
+      if (event === 'SIGNED_IN' && session) {
+        await loadUserProfile(session.user, false);
+      } else if (event === 'SIGNED_OUT') {
+        handleSignOut();
+      } else if (event === 'TOKEN_REFRESHED' && session) {
+        // Silent refresh - update cache without showing loading
+        await loadUserProfile(session.user, false);
+      }
+    });
 
     return () => {
-      mounted = false;
-      authSubscription?.unsubscribe();
+      subscription.unsubscribe();
     };
-  }, []); // Empty deps - run once on mount
+  }, []);
+
+  /**
+   * Validate session in background without blocking UI
+   */
+  const validateSessionInBackground = async (): Promise<void> => {
+    // Don't check if we checked recently
+    if (!authCache.shouldCheckSession()) {
+      return;
+    }
+
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error || !session) {
+        // Session invalid, clear cache and state
+        handleSignOut();
+        return;
+      }
+
+      // Session valid, update cache timestamp
+      authCache.markSessionChecked();
+      
+      // Optionally refresh user profile if data might be stale
+      // But don't show loading state
+      await loadUserProfile(session.user, false);
+    } catch (error) {
+      console.error('Background session validation failed:', error);
+      // Don't logout on network errors, keep using cache
+    }
+  };
 
   /**
    * Handle sign out - clear everything
@@ -156,20 +121,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     authCache.clear();
     secureStorage.clear();
-    // Don't set loading to false here - let the caller handle it
+    setIsLoading(false);
   };
 
   // Load user profile from database
   const loadUserProfile = async (supabaseUser: SupabaseUser, showLoading: boolean = true): Promise<void> => {
-    // Prevent concurrent loads
-    if (isValidatingRef.current) {
-      console.log('⏭️ Skipping concurrent profile load');
-      return;
-    }
-
     try {
-      isValidatingRef.current = true;
-      
       if (showLoading) {
         setIsLoading(true);
       }
@@ -227,21 +184,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (showLoading) {
         setIsLoading(false);
       }
-      
-      isValidatingRef.current = false;
     }
   };
 
   const checkSession = async (): Promise<void> => {
-    // Prevent concurrent session checks
-    if (isValidatingRef.current) {
-      console.log('⏭️ Skipping concurrent session check');
-      return;
-    }
-
     try {
-      isValidatingRef.current = true;
-      setIsLoading(true);
+      // Don't show loading for background checks
+      const shouldShowLoading = !authCache.isAuthenticated();
+      
+      if (shouldShowLoading) {
+        setIsLoading(true);
+      }
       
       // Check Supabase session
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -249,25 +202,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error('Session check error:', error);
         handleSignOut();
-        setIsLoading(false);
         return;
       }
 
       if (session?.user) {
-        await loadUserProfile(session.user, false);
+        await loadUserProfile(session.user, shouldShowLoading);
         authCache.markSessionChecked();
       } else {
         // No active session
         handleSignOut();
       }
-      
-      setIsLoading(false);
     } catch (error) {
       console.error('Session check failed:', error);
-      handleSignOut();
-      setIsLoading(false);
+      // On error, if we have cache, keep using it (offline support)
+      if (!authCache.isAuthenticated()) {
+        handleSignOut();
+      }
     } finally {
-      isValidatingRef.current = false;
+      setIsLoading(false);
     }
   };
 
