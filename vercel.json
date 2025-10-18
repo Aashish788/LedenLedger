@@ -69,10 +69,32 @@
     }
   ],
   
-  "functions": {
-    "api/**/*.js": {
-      "memory": 1024,
-      "maxDuration": 10
+  "routes": [
+    {
+      "src": "/robots.txt",
+      "dest": "/robots.txt"
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "/sitemap.xml"
+    },
+    {
+      "src": "/favicon.ico",
+      "dest": "/favicon.ico"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  
+  "env": {
+    "NODE_ENV": "production"
+  },
+  
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
     }
   },
   
@@ -80,5 +102,9 @@
   
   "trailingSlash": false,
   
-  "cleanUrls": true
+  "cleanUrls": true,
+  
+  "github": {
+    "silent": true
+  }
 }
