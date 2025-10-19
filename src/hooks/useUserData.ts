@@ -51,7 +51,7 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
 
   /**
    * Fetch user data
-   * FIX: Removed from useCallback to prevent infinite loops
+   * CRITICAL FIX: Ensure session is ready before fetching
    */
   const fetchData = useCallback(async (isRefresh: boolean = false) => {
     try {
@@ -62,6 +62,10 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
       }
       
       setError(null);
+
+      // CRITICAL FIX: Ensure session is initialized before fetching data
+      const { ensureSessionReady } = await import('@/integrations/supabase/client');
+      await ensureSessionReady();
 
       const response = await userDataService.fetchAllUserData();
 

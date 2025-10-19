@@ -72,6 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // If we have cached auth, validate in background (non-blocking)
     const initAuth = async () => {
+      // CRITICAL FIX: Import session initialization helper
+      const { ensureSessionReady } = await import('@/integrations/supabase/client');
+      
+      // INDUSTRY-GRADE: Ensure Supabase session is loaded from storage first
+      await ensureSessionReady();
+      
       if (cachedState?.isAuthenticated) {
         // User sees UI immediately, we validate in background
         validateSessionInBackground();
@@ -242,8 +248,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
       }
       
-      // Check Supabase session
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // CRITICAL FIX: Ensure session is ready before checking
+      const { ensureSessionReady } = await import('@/integrations/supabase/client');
+      await ensureSessionReady();
+      
+      // Check Supabase session with retry logic
+      let session = null;
+      let error = null;
+      
+      // Try up to 3 times with delays (handles browser reopen scenario)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const result = await supabase.auth.getSession();
+        error = result.error;
+        session = result.data.session;
+        
+        if (session || error) {
+          break; // Got a session or a real error
+        }
+        
+        // No session yet, wait and retry (session might still be loading)
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
       
       if (error) {
         console.error('Session check error:', error);
@@ -255,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await loadUserProfile(session.user, shouldShowLoading);
         authCache.markSessionChecked();
       } else {
-        // No active session
+        // No active session after retries
         handleSignOut();
       }
     } catch (error) {

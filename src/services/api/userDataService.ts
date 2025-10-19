@@ -287,25 +287,64 @@ class UserDataService {
 
   /**
    * Validate user authentication
+   * CRITICAL FIX: Wait for session to be ready and retry on failure
    * @private
    */
-  private async validateUser(): Promise<string | null> {
+  private async validateUser(retries = 3): Promise<string | null> {
+    // CRITICAL: Import the session initialization helper
+    const { ensureSessionReady } = await import('@/integrations/supabase/client');
+    
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('[UserDataService] Authentication error:', error);
-        return null;
+      // INDUSTRY-GRADE FIX: Ensure session is loaded from storage first
+      await ensureSessionReady();
+
+      // Now get the session with retry logic
+      for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error(`[UserDataService] Authentication error (attempt ${attempt + 1}/${retries}):`, error);
+            
+            // On auth error, wait before retry with exponential backoff
+            if (attempt < retries - 1) {
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 200));
+              continue;
+            }
+            return null;
+          }
+
+          if (!session?.user?.id) {
+            // If no session on first attempt, it might still be loading
+            if (attempt === 0) {
+              await new Promise(resolve => setTimeout(resolve, 300));
+              continue;
+            }
+            
+            console.error('[UserDataService] No authenticated user found');
+            return null;
+          }
+
+          // SUCCESS: Return user ID
+          if (import.meta.env.DEV && attempt > 0) {
+            console.log(`[UserDataService] ✅ Session validated on attempt ${attempt + 1}`);
+          }
+          
+          return session.user.id;
+        } catch (attemptError) {
+          console.error(`[UserDataService] Validation attempt ${attempt + 1} failed:`, attemptError);
+          
+          if (attempt < retries - 1) {
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 200));
+            continue;
+          }
+          throw attemptError;
+        }
       }
 
-      if (!session?.user?.id) {
-        console.error('[UserDataService] No authenticated user found');
-        return null;
-      }
-
-      return session.user.id;
+      return null;
     } catch (error) {
-      console.error('[UserDataService] Failed to validate user:', error);
+      console.error('[UserDataService] Failed to validate user after retries:', error);
       return null;
     }
   }
