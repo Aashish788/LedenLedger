@@ -13,43 +13,5 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
   }
 });
-
-// CRITICAL FIX: Session initialization promise
-// This ensures the session is loaded before any API calls are made
-let sessionInitialized = false;
-let sessionInitPromise: Promise<void> | null = null;
-
-/**
- * INDUSTRY-GRADE FIX: Wait for session to be restored from storage
- * This prevents race conditions when browser is reopened
- */
-export async function ensureSessionReady(): Promise<void> {
-  if (sessionInitialized) {
-    return;
-  }
-
-  if (sessionInitPromise) {
-    return sessionInitPromise;
-  }
-
-  sessionInitPromise = (async () => {
-    try {
-      // Force Supabase to restore session from localStorage
-      await supabase.auth.getSession();
-      sessionInitialized = true;
-      
-      if (import.meta.env.DEV) {
-        console.log('✅ Supabase session initialized');
-      }
-    } catch (error) {
-      console.error('❌ Failed to initialize Supabase session:', error);
-      sessionInitialized = true; // Mark as done even on error to prevent hanging
-    }
-  })();
-
-  return sessionInitPromise;
-}
