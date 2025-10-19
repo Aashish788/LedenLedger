@@ -40,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(cachedState?.user || null);
   const [isLoading, setIsLoading] = useState(false); // Start with false for optimistic loading
   const [csrfToken, setCsrfToken] = useState(generateCSRFToken());
+  const [hasInitializedSession, setHasInitializedSession] = useState(false);
 
   // Generate new CSRF token periodically
   useEffect(() => {
@@ -69,6 +70,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event);
       
+      if (event === 'INITIAL_SESSION') {
+        setHasInitializedSession(true);
+
+        if (session?.user) {
+          authCache.markSessionChecked();
+          await loadUserProfile(session.user, false);
+        } else {
+          handleSignOut();
+        }
+
+        return;
+      }
+
       if (event === 'SIGNED_IN' && session) {
         await loadUserProfile(session.user, false);
       } else if (event === 'SIGNED_OUT') {
@@ -96,9 +110,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
       
-      if (error || !session) {
-        // Session invalid, clear cache and state
-        handleSignOut();
+      if (error) {
+        console.error('Background session validation failed:', error);
+        return;
+      }
+
+      if (!session) {
+        if (hasInitializedSession) {
+          handleSignOut();
+        } else {
+          authCache.invalidate();
+        }
         return;
       }
 
@@ -122,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authCache.clear();
     secureStorage.clear();
     setIsLoading(false);
+    setHasInitializedSession(true);
   };
 
   // Load user profile from database
@@ -166,7 +189,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastLogin: new Date().toISOString()
       };
 
-      setUser(userData);
+    setUser(userData);
+    setHasInitializedSession(true);
       
       // Update cache for instant access on next load
       authCache.set(userData, true);
@@ -210,7 +234,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         authCache.markSessionChecked();
       } else {
         // No active session
-        handleSignOut();
+        if (shouldShowLoading || hasInitializedSession) {
+          handleSignOut();
+        } else {
+          authCache.invalidate();
+        }
       }
     } catch (error) {
       console.error('Session check failed:', error);
