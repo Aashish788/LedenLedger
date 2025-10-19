@@ -65,11 +65,13 @@ export function ProtectedRoute({
       await checkSession();
       
       // Log successful validation
-      console.log('✅ Route protection: Session validated', {
-        route: location.pathname,
-        user: user.email,
-        timestamp: new Date().toISOString()
-      });
+      if (import.meta.env.DEV) {
+        console.log('✅ Route protection: Session validated', {
+          route: location.pathname,
+          user: user.email,
+          timestamp: new Date().toISOString()
+        });
+      }
     } catch (error) {
       console.error('❌ Route protection: Session validation failed', error);
       setValidationError('Session validation failed');
@@ -107,15 +109,17 @@ export function ProtectedRoute({
    */
   useEffect(() => {
     if (isAuthenticated && user) {
-      console.log('🔒 Protected route access:', {
-        route: location.pathname,
-        user: user.email,
-        userId: user.id,
-        role: user.role,
-        timestamp: new Date().toISOString(),
-        requireAdmin,
-        permissions
-      });
+      if (import.meta.env.DEV) {
+        console.log('🔒 Protected route access:', {
+          route: location.pathname,
+          user: user.email,
+          userId: user.id,
+          role: user.role,
+          timestamp: new Date().toISOString(),
+          requireAdmin,
+          permissions
+        });
+      }
     }
   }, [location.pathname, user, isAuthenticated, requireAdmin, permissions]);
 

@@ -6,7 +6,7 @@
  * - Smart state management
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { secureStorage, generateCSRFToken, checkRateLimit } from '@/lib/security';
@@ -40,15 +40,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(cachedState?.user || null);
   const [isLoading, setIsLoading] = useState(false); // Start with false for optimistic loading
   const [csrfToken, setCsrfToken] = useState(generateCSRFToken());
-  const [hasInitializedSession, setHasInitializedSession] = useState(false);
+  
+  // FIX: Store timer IDs for proper cleanup (CRITICAL MEMORY LEAK FIX)
+  const csrfIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const activityIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // FIX: CRITICAL - Prevent race condition in concurrent auth checks
+  const isValidatingSessionRef = useRef(false);
 
   // Generate new CSRF token periodically
   useEffect(() => {
-    const interval = setInterval(() => {
+    // FIX: Clear any existing interval before creating new one
+    if (csrfIntervalRef.current) {
+      clearInterval(csrfIntervalRef.current);
+    }
+    
+    csrfIntervalRef.current = setInterval(() => {
       setCsrfToken(generateCSRFToken());
     }, 30 * 60 * 1000); // Every 30 minutes
 
-    return () => clearInterval(interval);
+    // FIX: Proper cleanup - CRITICAL for preventing memory leaks
+    return () => {
+      if (csrfIntervalRef.current) {
+        clearInterval(csrfIntervalRef.current);
+        csrfIntervalRef.current = null;
+      }
+    };
   }, []);
 
   // Professional initialization - check session in background only if needed
@@ -68,21 +85,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Listen for auth state changes (token refresh, logout, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (import.meta.env.DEV) {
       console.log('Auth state changed:', event);
+    }
       
-      if (event === 'INITIAL_SESSION') {
-        setHasInitializedSession(true);
-
-        if (session?.user) {
-          authCache.markSessionChecked();
-          await loadUserProfile(session.user, false);
-        } else {
-          handleSignOut();
-        }
-
-        return;
-      }
-
       if (event === 'SIGNED_IN' && session) {
         await loadUserProfile(session.user, false);
       } else if (event === 'SIGNED_OUT') {
@@ -100,27 +106,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * Validate session in background without blocking UI
+   * FIX: CRITICAL - Added mutex to prevent concurrent validation
    */
   const validateSessionInBackground = async (): Promise<void> => {
+    // FIX: Prevent concurrent validation calls (race condition)
+    if (isValidatingSessionRef.current) {
+      if (import.meta.env.DEV) {
+        console.log('⏭️ Skipping validation - already in progress');
+      }
+      return;
+    }
+    
     // Don't check if we checked recently
     if (!authCache.shouldCheckSession()) {
       return;
     }
 
     try {
+      isValidatingSessionRef.current = true; // Lock
+      
       const { data: { session }, error } = await supabase.auth.getSession();
       
-      if (error) {
-        console.error('Background session validation failed:', error);
-        return;
-      }
-
-      if (!session) {
-        if (hasInitializedSession) {
-          handleSignOut();
-        } else {
-          authCache.invalidate();
-        }
+      if (error || !session) {
+        // Session invalid, clear cache and state
+        handleSignOut();
         return;
       }
 
@@ -133,6 +142,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Background session validation failed:', error);
       // Don't logout on network errors, keep using cache
+    } finally {
+      isValidatingSessionRef.current = false; // Unlock
     }
   };
 
@@ -144,7 +155,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authCache.clear();
     secureStorage.clear();
     setIsLoading(false);
-    setHasInitializedSession(true);
   };
 
   // Load user profile from database
@@ -176,9 +186,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error loading business settings:', businessError);
       }
 
-      // Create user object with proper null handling
-      const userName = (profile && profile.full_name) || (businessSettings && businessSettings.owner_name) || supabaseUser.email?.split('@')[0] || 'User';
-      const businessName = businessSettings && businessSettings.business_name ? businessSettings.business_name : undefined;
+      // FIX: Improved null safety with optional chaining and proper defaults
+      const userName = 
+        profile?.full_name || 
+        businessSettings?.owner_name || 
+        supabaseUser.email?.split('@')[0] || 
+        'User';
+      
+      // FIX: Safe access to businessSettings properties
+      const businessName = businessSettings?.business_name ?? undefined;
 
       const userData: User = {
         id: supabaseUser.id,
@@ -189,15 +205,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastLogin: new Date().toISOString()
       };
 
-    setUser(userData);
-    setHasInitializedSession(true);
+      setUser(userData);
       
       // Update cache for instant access on next load
       authCache.set(userData, true);
       
-      // Store user data in secure storage for quick access
-      secureStorage.setItem('auth_user', userData);
-      secureStorage.setItem('last_activity', Date.now());
+      // FIX: Wrap storage operations in try-catch for private browsing support
+      try {
+        secureStorage.setItem('auth_user', userData);
+        secureStorage.setItem('last_activity', Date.now());
+      } catch (storageError) {
+        // Silent fail for private browsing mode
+        if (import.meta.env.DEV) {
+          console.error('Failed to save to storage (private mode?):', storageError);
+        }
+      }
       
     } catch (error) {
       console.error('Failed to load user profile:', error);
@@ -234,11 +256,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         authCache.markSessionChecked();
       } else {
         // No active session
-        if (shouldShowLoading || hasInitializedSession) {
-          handleSignOut();
-        } else {
-          authCache.invalidate();
-        }
+        handleSignOut();
       }
     } catch (error) {
       console.error('Session check failed:', error);
@@ -380,8 +398,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       secureStorage.setItem('last_activity', Date.now());
     };
 
+    // FIX: Clear any existing interval before creating new one
+    if (activityIntervalRef.current) {
+      clearInterval(activityIntervalRef.current);
+    }
+
     // Check activity every minute
-    const interval = setInterval(checkActivity, 60 * 1000);
+    activityIntervalRef.current = setInterval(checkActivity, 60 * 1000);
     
     // Update activity on user interactions
     const updateActivity = () => secureStorage.setItem('last_activity', Date.now());
@@ -391,7 +414,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     document.addEventListener('scroll', updateActivity);
 
     return () => {
-      clearInterval(interval);
+      // FIX: Proper cleanup - CRITICAL for preventing memory leaks
+      if (activityIntervalRef.current) {
+        clearInterval(activityIntervalRef.current);
+        activityIntervalRef.current = null;
+      }
       document.removeEventListener('click', updateActivity);
       document.removeEventListener('keypress', updateActivity);
       document.removeEventListener('scroll', updateActivity);

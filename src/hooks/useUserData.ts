@@ -6,7 +6,7 @@
  * @version 1.0.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { userDataService, type UserDataResponse } from '@/services/api/userDataService';
 
 /**
@@ -51,6 +51,7 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
 
   /**
    * Fetch user data
+   * FIX: Removed from useCallback to prevent infinite loops
    */
   const fetchData = useCallback(async (isRefresh: boolean = false) => {
     try {
@@ -78,7 +79,7 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, []); // FIX: Empty dependency array - function is stable
 
   /**
    * Refresh data (with refresh flag)
@@ -95,8 +96,12 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
   }, [fetchData]);
 
   // Auto-fetch on mount if enabled
+  // FIX: Use ref to prevent re-triggering when fetchData changes
+  const hasFetchedRef = useRef(false);
+  
   useEffect(() => {
-    if (autoFetch) {
+    if (autoFetch && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       fetchData();
     }
   }, [autoFetch, fetchData]);

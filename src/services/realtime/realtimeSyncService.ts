@@ -103,6 +103,15 @@ class RealtimeSyncService {
   private baseRetryDelay = 1000; // 1 second
   private userId: string | null = null;
   
+  // Cleanup handlers (FIX: Memory leak prevention)
+  private onlineHandler: (() => void) | null = null;
+  private offlineHandler: (() => void) | null = null;
+  private authSubscription: { unsubscribe: () => void } | null = null;
+  
+  // FIX: CRITICAL - Store timer IDs for proper cleanup
+  private connectionMonitorInterval: NodeJS.Timeout | null = null;
+  private retryTimeouts: Set<NodeJS.Timeout> = new Set();
+  
   // Status tracking
   private syncStatus: SyncStatus = {
     isOnline: navigator.onLine,
@@ -121,28 +130,37 @@ class RealtimeSyncService {
   // ============================================================================
 
   private async initializeService() {
-    console.log('🚀 Initializing Real-Time Sync Service...');
+    if (import.meta.env.DEV) {
+      console.log('🚀 Initializing Real-Time Sync Service...');
+    }
     
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
     this.userId = user?.id || null;
 
-    // Setup online/offline detection
-    window.addEventListener('online', () => this.handleOnline());
-    window.addEventListener('offline', () => this.handleOffline());
+    // Setup online/offline detection (FIX: Store handlers for cleanup)
+    this.onlineHandler = () => this.handleOnline();
+    this.offlineHandler = () => this.handleOffline();
+    window.addEventListener('online', this.onlineHandler);
+    window.addEventListener('offline', this.offlineHandler);
 
-    // Setup auth state listener
-    supabase.auth.onAuthStateChange((event, session) => {
+    // Setup auth state listener (FIX: Store subscription for cleanup)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       this.userId = session?.user?.id || null;
       
       if (event === 'SIGNED_IN') {
-        console.log('✅ User signed in, reconnecting subscriptions...');
+        if (import.meta.env.DEV) {
+          console.log('✅ User signed in, reconnecting subscriptions...');
+        }
         this.reconnectAllSubscriptions();
       } else if (event === 'SIGNED_OUT') {
-        console.log('🔴 User signed out, cleaning up subscriptions...');
+        if (import.meta.env.DEV) {
+          console.log('🔴 User signed out, cleaning up subscriptions...');
+        }
         this.cleanupAllSubscriptions();
       }
     });
+    this.authSubscription = subscription;
 
     // Load offline queue from localStorage
     this.loadOfflineQueue();
@@ -150,7 +168,41 @@ class RealtimeSyncService {
     // Setup connection monitoring
     this.setupConnectionMonitoring();
 
-    console.log('✅ Real-Time Sync Service initialized');
+    if (import.meta.env.DEV) {
+      console.log('✅ Real-Time Sync Service initialized');
+    }
+  }
+
+  /**
+   * Cleanup method to prevent memory leaks
+   * CRITICAL: Call this when component unmounts or app closes
+   */
+  public destroy(): void {
+    // Remove event listeners
+    if (this.onlineHandler) {
+      window.removeEventListener('online', this.onlineHandler);
+      this.onlineHandler = null;
+    }
+    if (this.offlineHandler) {
+      window.removeEventListener('offline', this.offlineHandler);
+      this.offlineHandler = null;
+    }
+
+    // Unsubscribe from auth changes
+    if (this.authSubscription) {
+      this.authSubscription.unsubscribe();
+      this.authSubscription = null;
+    }
+
+    // Cleanup all channels
+    this.cleanupAllSubscriptions();
+
+    // Clear listeners
+    this.syncStatusListeners.clear();
+
+    if (import.meta.env.DEV) {
+      console.log('🧹 Real-Time Sync Service destroyed');
+    }
   }
 
   // ============================================================================
@@ -316,6 +368,17 @@ class RealtimeSyncService {
     data: Omit<T, 'id' | 'created_at' | 'updated_at'>,
     options?: { optimisticId?: string }
   ): Promise<{ data: T | null; error: any; isOptimistic: boolean }> {
+    // FIX: Validate user_id exists before any operation
+    if (!this.userId) {
+      const error = new Error('User not authenticated - cannot create record');
+      console.error('❌ Create operation failed:', error);
+      return {
+        data: null,
+        error,
+        isOptimistic: false,
+      };
+    }
+
     // Generate a real UUID for the record (required for client-side ID generation)
     const recordId = options?.optimisticId || generateUUID();
     
@@ -328,7 +391,9 @@ class RealtimeSyncService {
       updated_at: new Date().toISOString(),
     } as T;
 
-    console.log(`⚡ Optimistically creating ${table}:`, optimisticRecord);
+    if (import.meta.env.DEV) {
+      console.log(`⚡ Optimistically creating ${table}:`, optimisticRecord);
+    }
 
     // If offline, queue the operation
     if (!this.syncStatus.isOnline) {
@@ -403,6 +468,16 @@ class RealtimeSyncService {
     data: Partial<T>,
     options?: { skipOptimistic?: boolean }
   ): Promise<{ data: T | null; error: any; isOptimistic: boolean }> {
+    // FIX: Validate user_id exists before any operation
+    if (!this.userId) {
+      const error = new Error('User not authenticated - cannot update record');
+      console.error('❌ Update operation failed:', error);
+      return {
+        data: null,
+        error,
+        isOptimistic: false,
+      };
+    }
     
     // Create optimistic update
     const optimisticRecord = {
@@ -411,7 +486,9 @@ class RealtimeSyncService {
       updated_at: new Date().toISOString(),
     } as T;
 
-    console.log(`⚡ Optimistically updating ${table}:`, optimisticRecord);
+    if (import.meta.env.DEV) {
+      console.log(`⚡ Optimistically updating ${table}:`, optimisticRecord);
+    }
 
     // If offline, queue the operation
     if (!this.syncStatus.isOnline) {
@@ -652,23 +729,44 @@ class RealtimeSyncService {
   }
 
   private loadOfflineQueue() {
+    // FIX: Enhanced error handling for localStorage (private browsing support)
     try {
+      if (typeof localStorage === 'undefined') {
+        console.warn('localStorage not available');
+        return;
+      }
+      
       const saved = localStorage.getItem('offline_queue');
       if (saved) {
         this.offlineQueue = JSON.parse(saved);
         this.updateSyncStatus({ pendingOperations: this.offlineQueue.length });
-        console.log(`📥 Loaded ${this.offlineQueue.length} offline operations`);
+        
+        if (import.meta.env.DEV) {
+          console.log(`📥 Loaded ${this.offlineQueue.length} offline operations`);
+        }
       }
     } catch (error) {
-      console.error('❌ Error loading offline queue:', error);
+      // Silent fail for private browsing mode
+      console.error('❌ Error loading offline queue (private browsing?):', error);
+      this.offlineQueue = []; // Reset to empty array
     }
   }
 
   private saveOfflineQueue() {
+    // FIX: Enhanced error handling for localStorage (private browsing support)
     try {
+      if (typeof localStorage === 'undefined') {
+        console.warn('localStorage not available, offline queue not persisted');
+        return;
+      }
+      
       localStorage.setItem('offline_queue', JSON.stringify(this.offlineQueue));
     } catch (error) {
-      console.error('❌ Error saving offline queue:', error);
+      // Silent fail for private browsing mode or quota exceeded
+      if (import.meta.env.DEV) {
+        console.error('❌ Error saving offline queue (private browsing or quota exceeded?):', error);
+      }
+      // Don't throw - gracefully degrade functionality
     }
   }
 
@@ -677,8 +775,13 @@ class RealtimeSyncService {
   // ============================================================================
 
   private setupConnectionMonitoring() {
+    // FIX: CRITICAL - Clear any existing interval before creating new one
+    if (this.connectionMonitorInterval) {
+      clearInterval(this.connectionMonitorInterval);
+    }
+    
     // Check connection status every 30 seconds
-    setInterval(() => {
+    this.connectionMonitorInterval = setInterval(() => {
       if (this.syncStatus.isOnline && this.channels.size > 0) {
         // Ping to check if connection is alive
         this.checkConnectionHealth();
@@ -715,9 +818,13 @@ class RealtimeSyncService {
       
       console.log(`🔄 Retrying connection in ${delay}ms (attempt ${this.connectionRetries}/${this.maxRetries})...`);
       
-      setTimeout(() => {
+      // FIX: CRITICAL - Track timeout ID to prevent memory leak
+      const timeoutId = setTimeout(() => {
+        this.retryTimeouts.delete(timeoutId); // Remove from tracking set
         this.reconnectAllSubscriptions();
       }, delay);
+      
+      this.retryTimeouts.add(timeoutId);
     } else {
       this.updateSyncStatus({ 
         error: 'Connection failed. Please check your internet and refresh the page.' 
@@ -820,6 +927,19 @@ class RealtimeSyncService {
    */
   public async cleanup() {
     console.log('🧹 Cleaning up Real-Time Sync Service...');
+    
+    // FIX: CRITICAL - Clear connection monitoring interval
+    if (this.connectionMonitorInterval) {
+      clearInterval(this.connectionMonitorInterval);
+      this.connectionMonitorInterval = null;
+    }
+    
+    // FIX: CRITICAL - Clear all pending retry timeouts
+    this.retryTimeouts.forEach(timeoutId => {
+      clearTimeout(timeoutId);
+    });
+    this.retryTimeouts.clear();
+    
     await this.cleanupAllSubscriptions();
     this.syncStatusListeners.clear();
   }

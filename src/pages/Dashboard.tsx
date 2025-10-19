@@ -1,7 +1,12 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Search, Sparkles, TrendingUp, FileText, Users, Building2 } from "lucide-react";
+import { useBusinessContext } from "@/contexts/BusinessContext";
+import { getGreetingWithName } from "@/utils/greetings";
+import { AnimatedGreeting } from "@/components/AnimatedGreeting";
 
 export default function Dashboard() {
+  const { businessProfile } = useBusinessContext();
+  
   const currentDate = new Date().toLocaleDateString('en-US', { 
     weekday: 'long', 
     month: 'short', 
@@ -9,12 +14,19 @@ export default function Dashboard() {
     year: 'numeric' 
   });
 
+  const greeting = getGreetingWithName(businessProfile.ownerName);
+
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-8 px-4 sm:px-6 py-6 sm:py-8">
         {/* Header Section */}
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Good morning, User</h1>
+          <AnimatedGreeting 
+            text={greeting} 
+            className="text-2xl sm:text-3xl font-bold text-foreground"
+            typingSpeed={38}
+            showCursor={true}
+          />
           <p className="text-sm text-muted-foreground">{currentDate}</p>
         </div>
 

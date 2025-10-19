@@ -8,6 +8,8 @@ import React, { useEffect, useState } from 'react';
 import { userDataService, type UserDataResponse } from '@/services/api/userDataService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { getGreetingWithName } from '@/utils/greetings';
+import { AnimatedGreeting } from '@/components/AnimatedGreeting';
 import { 
   Users, 
   Building2, 
@@ -112,11 +114,14 @@ export function DashboardWithUserData() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">
-            Welcome, {data.businessSettings?.business_name || 'User'}
-          </h1>
+          <AnimatedGreeting 
+            text={getGreetingWithName(data.businessSettings?.owner_name || '')}
+            className="text-3xl font-bold"
+            typingSpeed={38}
+            showCursor={true}
+          />
           <p className="text-gray-600 mt-1">
-            {data.businessSettings?.owner_name && `Owner: ${data.businessSettings.owner_name}`}
+            {data.businessSettings?.business_name || 'My Business'}
           </p>
         </div>
         <button

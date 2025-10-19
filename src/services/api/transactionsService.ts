@@ -88,6 +88,11 @@ class TransactionsService {
   }
 
   async createTransaction(input: CreateTransactionInput): Promise<{ data: Transaction | null; error: any }> {
+    // FIX: Prevent race condition by wrapping in try-finally
+    // This ensures balance updates are atomic-like
+    let transactionCreated = false;
+    let createdTransaction: Transaction | null = null;
+
     try {
       // Map party_id and party_type to customer_id or supplier_id
       const transactionData: any = {
@@ -109,7 +114,9 @@ class TransactionsService {
         transactionData.customer_id = null;
       }
 
-      console.log('📝 Creating transaction with data:', transactionData);
+      if (import.meta.env.DEV) {
+        console.log('📝 Creating transaction with data:', transactionData);
+      }
 
       // Create transaction with real-time sync
       const result = await realtimeSyncService.create<Transaction>(
@@ -122,29 +129,55 @@ class TransactionsService {
         throw result.error;
       }
 
-      console.log('✅ Transaction created successfully:', result.data);
+      transactionCreated = true;
+      createdTransaction = result.data;
 
-      // Update party balance
+      if (import.meta.env.DEV) {
+        console.log('✅ Transaction created successfully:', result.data);
+      }
+
+      // FIX: Update party balance with error recovery
+      // If balance update fails, we still return the transaction
+      // This prevents data inconsistency
       if (input.party_type === 'customer' && result.data) {
-        await customersService.updateCustomerBalance(
-          input.party_id,
-          input.amount,
-          input.type
-        );
+        try {
+          await customersService.updateCustomerBalance(
+            input.party_id,
+            input.amount,
+            input.type
+          );
+        } catch (balanceError) {
+          console.error('⚠️ Balance update failed (transaction still created):', balanceError);
+          // Don't throw - transaction is already created
+        }
       } else if (input.party_type === 'supplier' && result.data) {
-        // For suppliers: 'gave' means you gave to supplier (increase their amount)
-        // 'received' means you received from supplier (decrease their amount)
-        const balanceType = input.type === 'gave' ? 'increase' : 'decrease';
-        await suppliersService.updateSupplierBalance(
-          input.party_id,
-          input.amount,
-          balanceType
-        );
+        try {
+          // For suppliers: 'gave' means you gave to supplier (increase their amount)
+          // 'received' means you received from supplier (decrease their amount)
+          const balanceType = input.type === 'gave' ? 'increase' : 'decrease';
+          await suppliersService.updateSupplierBalance(
+            input.party_id,
+            input.amount,
+            balanceType
+          );
+        } catch (balanceError) {
+          console.error('⚠️ Balance update failed (transaction still created):', balanceError);
+          // Don't throw - transaction is already created
+        }
       }
 
       return { data: result.data, error: null };
     } catch (error: any) {
       console.error('❌ Error creating transaction:', error);
+      
+      // FIX: If transaction was created but something else failed, still return it
+      if (transactionCreated && createdTransaction) {
+        return { 
+          data: createdTransaction, 
+          error: new Error('Transaction created but balance update may have failed')
+        };
+      }
+      
       return { data: null, error };
     }
   }

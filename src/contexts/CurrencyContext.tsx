@@ -57,23 +57,42 @@ const STORAGE_KEY = 'selected_currency';
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [currencyCode, setCurrencyCode] = useState<CurrencyCode>('INR');
 
-  // Load currency preference from localStorage on mount
+  // FIX: Load currency preference with proper error handling and cleanup
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored && stored in CURRENCIES) {
-        setCurrencyCode(stored as CurrencyCode);
+    let isMounted = true; // FIX: Prevent state updates after unmount
+    
+    const loadCurrency = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored && stored in CURRENCIES && isMounted) {
+          setCurrencyCode(stored as CurrencyCode);
+        }
+      } catch (error) {
+        console.error('Error loading currency preference:', error);
+        // Graceful degradation - use default INR
       }
-    } catch (error) {
-      console.error('Error loading currency preference:', error);
-    }
-  }, []);
+    };
+    
+    loadCurrency();
+    
+    // FIX: Add cleanup
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Empty dependency array - run once on mount
 
   const currency = CURRENCIES[currencyCode];
 
   const setCurrency = (code: CurrencyCode) => {
     setCurrencyCode(code);
-    localStorage.setItem(STORAGE_KEY, code);
+    
+    // FIX: Wrap localStorage in try-catch
+    try {
+      localStorage.setItem(STORAGE_KEY, code);
+    } catch (error) {
+      console.error('Error saving currency preference:', error);
+      // Continue anyway - not critical
+    }
   };
 
   const format = (amount: number, options?: Intl.NumberFormatOptions): string => {

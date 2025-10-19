@@ -74,12 +74,23 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load business profile from Supabase on mount
+  // FIX: Load business profile on mount with proper dependency array
   useEffect(() => {
-    loadBusinessProfile();
-  }, []);
+    let isMounted = true; // FIX: Prevent state updates after unmount
+    
+    const loadProfile = async () => {
+      await loadBusinessProfile(isMounted);
+    };
+    
+    loadProfile();
+    
+    // FIX: Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Empty array - only run on mount
 
-  const loadBusinessProfile = async () => {
+  const loadBusinessProfile = async (isMounted: boolean = true) => {
     setIsLoading(true);
     
     try {
@@ -88,8 +99,10 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       
       if (!session?.user?.id) {
         console.warn('[BusinessContext] No authenticated user, loading defaults');
-        setBusinessProfile(defaultBusinessProfile);
-        setIsLoaded(true);
+        if (isMounted) {
+          setBusinessProfile(defaultBusinessProfile);
+          setIsLoaded(true);
+        }
         setIsLoading(false);
         return;
       }
@@ -107,6 +120,9 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         console.error('[BusinessContext] Supabase fetch error:', error);
         throw error;
       }
+
+      // FIX: Only update state if component is still mounted
+      if (!isMounted) return;
 
       if (data) {
         const profile: BusinessProfile = {
@@ -130,14 +146,22 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         };
         setBusinessProfile(profile);
         
-        // Save to localStorage for offline access
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+        // FIX: Wrap localStorage in try-catch for safety
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+        } catch (storageError) {
+          console.error('[BusinessContext] localStorage save failed:', storageError);
+          // Continue without localStorage - not critical
+        }
       } else {
         // No settings yet - use defaults
         setBusinessProfile(defaultBusinessProfile);
       }
     } catch (error) {
       console.error('[BusinessContext] Error loading business profile:', error);
+      
+      // FIX: Only update state if component is still mounted
+      if (!isMounted) return;
       
       // Fallback to localStorage as last resort
       try {
@@ -153,7 +177,9 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         setBusinessProfile(defaultBusinessProfile);
       }
     } finally {
-      setIsLoaded(true);
+      if (isMounted) {
+        setIsLoaded(true);
+      }
       setIsLoading(false);
     }
   };
@@ -161,11 +187,21 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const updateBusinessProfile = async (updates: Partial<BusinessProfile>): Promise<boolean> => {
     const updated = { ...businessProfile, ...updates };
     
+    // FIX: Store original state for rollback on error
+    const originalProfile = businessProfile;
+    
     // Optimistic update - update UI immediately
     setBusinessProfile(updated);
     
-    // Save to localStorage immediately
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    // FIX: Atomic localStorage operation with rollback capability
+    let localStorageSaved = false;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      localStorageSaved = true;
+    } catch (storageError) {
+      console.error('[BusinessContext] localStorage save failed:', storageError);
+      // Continue to try Supabase anyway
+    }
     
     // Sync with Supabase
     try {
@@ -175,6 +211,16 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       if (!session?.user?.id) {
         console.warn('[BusinessContext] No authenticated user for update');
         toast.error('Please log in to save settings');
+        
+        // FIX: Rollback optimistic update on error
+        setBusinessProfile(originalProfile);
+        if (localStorageSaved) {
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(originalProfile));
+          } catch (e) {
+            // Silent fail on rollback
+          }
+        }
         return false;
       }
 

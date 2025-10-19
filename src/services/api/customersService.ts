@@ -6,12 +6,14 @@
  * - Optimistic updates
  * - Offline support
  * - Full type safety
+ * - AbortController support to prevent memory leaks
  * 
- * @version 2.0.0
+ * @version 2.1.0
  */
 
 import { realtimeSyncService } from '@/services/realtime/realtimeSyncService';
 import { supabase } from '@/integrations/supabase/client';
+import { withAbortController, isAbortError } from '@/lib/abortController';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -70,11 +72,13 @@ class CustomersService {
 
   /**
    * Fetch all customers for the current user
+   * FIX: Added AbortSignal support to prevent memory leaks
    */
   async fetchCustomers(options?: {
     limit?: number;
     offset?: number;
     searchQuery?: string;
+    signal?: AbortSignal; // FIX: Add abort support
   }): Promise<{ data: Customer[] | null; error: any; count: number }> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -103,7 +107,12 @@ class CustomersService {
         query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
       }
 
-      const { data, error, count } = await query;
+      // FIX: Wrap with AbortController support
+      const result = options?.signal 
+        ? await withAbortController(query, options.signal)
+        : await query;
+      
+      const { data, error, count } = result;
 
       if (error) throw error;
 
@@ -113,6 +122,11 @@ class CustomersService {
         count: count || 0,
       };
     } catch (error: any) {
+      // FIX: Don't log aborted requests as errors
+      if (isAbortError(error)) {
+        return { data: null, error: null, count: 0 };
+      }
+      
       console.error('❌ Error fetching customers:', error);
       return {
         data: null,
@@ -124,8 +138,12 @@ class CustomersService {
 
   /**
    * Fetch a single customer by ID
+   * FIX: Added AbortSignal support to prevent memory leaks
    */
-  async fetchCustomerById(id: string): Promise<{ data: Customer | null; error: any }> {
+  async fetchCustomerById(
+    id: string, 
+    signal?: AbortSignal // FIX: Add abort support
+  ): Promise<{ data: Customer | null; error: any }> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -133,13 +151,20 @@ class CustomersService {
         throw new Error('User not authenticated');
       }
 
-      const { data, error } = await (supabase as any)
+      const query = (supabase as any)
         .from(this.tableName)
         .select('*')
         .eq('id', id)
         .eq('user_id', user.id)
         .is('deleted_at', null)
         .single();
+
+      // FIX: Wrap with AbortController support
+      const result = signal 
+        ? await withAbortController(query, signal)
+        : await query;
+      
+      const { data, error } = result;
 
       if (error) throw error;
 
@@ -281,6 +306,10 @@ class CustomersService {
 
   /**
    * Update customer balance after transaction
+   * FIX: CRITICAL - Use database-level atomic operation to prevent race conditions
+   * 
+   * Previously: fetch customer → calculate → update (3 operations, non-atomic)
+   * Now: Single UPDATE with WHERE condition (1 atomic operation)
    */
   async updateCustomerBalance(
     customerId: string, 
@@ -288,31 +317,109 @@ class CustomersService {
     transactionType: 'gave' | 'got'
   ): Promise<{ success: boolean; error: any }> {
     try {
-      // Fetch current customer
-      const { data: customer, error: fetchError } = await this.fetchCustomerById(customerId);
+      const { data: { user } } = await supabase.auth.getUser();
       
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // FIX: CRITICAL - Use database-level atomic UPDATE with increment/decrement
+      // This prevents race conditions where multiple transactions update the same customer
+      // The database will handle the calculation atomically
+      
+      const amountDelta = transactionType === 'gave' ? transactionAmount : -transactionAmount;
+      
+      // Use PostgreSQL RPC function for atomic balance update
+      const { data, error } = await (supabase as any).rpc('update_customer_balance_atomic', {
+        p_customer_id: customerId,
+        p_user_id: user.id,
+        p_amount_delta: amountDelta,
+        p_last_transaction: new Date().toISOString()
+      });
+
+      if (error) {
+        // If RPC function doesn't exist, fall back to optimistic locking
+        console.warn('⚠️ RPC function not found, using optimistic locking fallback');
+        return await this.updateCustomerBalanceWithOptimisticLocking(customerId, transactionAmount, transactionType);
+      }
+
+      return {
+        success: true,
+        error: null,
+      };
+    } catch (error: any) {
+      console.error('❌ Error updating customer balance:', error);
+      return {
+        success: false,
+        error,
+      };
+    }
+  }
+
+  /**
+   * Fallback method with optimistic locking (version-based concurrency control)
+   * FIX: Uses updated_at as version field for detecting concurrent updates
+   */
+  private async updateCustomerBalanceWithOptimisticLocking(
+    customerId: string,
+    transactionAmount: number,
+    transactionType: 'gave' | 'got'
+  ): Promise<{ success: boolean; error: any }> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Fetch customer with current version (updated_at)
+      const { data: customer, error: fetchError } = await (supabase as any)
+        .from(this.tableName)
+        .select('id, amount, updated_at')
+        .eq('id', customerId)
+        .eq('user_id', user.id)
+        .single();
+
       if (fetchError || !customer) {
         throw fetchError || new Error('Customer not found');
       }
 
+      const currentVersion = customer.updated_at;
+      
       // Calculate new balance
-      let newAmount = customer.amount;
-      if (transactionType === 'gave') {
-        // Customer owes more (they received money/goods)
-        newAmount += transactionAmount;
-      } else {
-        // Customer owes less (they paid)
-        newAmount -= transactionAmount;
-      }
+      const amountDelta = transactionType === 'gave' ? transactionAmount : -transactionAmount;
+      const newAmount = customer.amount + amountDelta;
 
-      // Update customer
-      const { error: updateError } = await this.updateCustomer(customerId, {
-        amount: newAmount,
-        last_transaction: new Date().toISOString(),
-      });
+      // Update with optimistic lock - only succeeds if updated_at hasn't changed
+      const { data: updatedCustomer, error: updateError } = await (supabase as any)
+        .from(this.tableName)
+        .update({
+          amount: newAmount,
+          last_transaction: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', customerId)
+        .eq('user_id', user.id)
+        .eq('updated_at', currentVersion) // Optimistic lock condition
+        .select()
+        .single();
 
       if (updateError) {
+        // Check if it's a concurrency conflict
+        if (updateError.code === 'PGRST116') {
+          throw new Error('CONCURRENCY_CONFLICT: Balance was updated by another transaction. Please retry.');
+        }
         throw updateError;
+      }
+
+      if (!updatedCustomer) {
+        // No rows affected = concurrent update detected
+        throw new Error('CONCURRENCY_CONFLICT: Balance was updated by another transaction. Please retry.');
+      }
+
+      return {
+        success: true,
+        error: null,
       }
 
       return {
