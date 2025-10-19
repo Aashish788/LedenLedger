@@ -70,11 +70,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Professional initialization - check session in background only if needed
   useEffect(() => {
-    // If we have cached auth, validate in background (non-blocking)
+    // FIX: CRITICAL - Proper session restoration after browser close/reopen
     const initAuth = async () => {
       if (cachedState?.isAuthenticated) {
-        // User sees UI immediately, we validate in background
-        validateSessionInBackground();
+        // FIX: Show loading while we verify the cached session is still valid
+        setIsLoading(true);
+        
+        try {
+          // Verify cached session is still valid
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          if (error || !session) {
+            // Session expired - clear everything immediately
+            console.log('🔴 Cached session expired, clearing...');
+            handleSignOut();
+            return;
+          }
+          
+          // Session is valid - load user data
+          console.log('✅ Cached session valid, loading profile...');
+          await loadUserProfile(session.user, false);
+          authCache.markSessionChecked();
+        } catch (error) {
+          console.error('❌ Session verification failed:', error);
+          handleSignOut();
+        } finally {
+          // FIX: Always clear loading state
+          setIsLoading(false);
+        }
       } else {
         // No cache, check session (but only once on mount)
         await checkSession();
@@ -107,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * Validate session in background without blocking UI
    * FIX: CRITICAL - Added mutex to prevent concurrent validation
+   * NOTE: This is now DEPRECATED - we validate on mount instead
    */
   const validateSessionInBackground = async (): Promise<void> => {
     // FIX: Prevent concurrent validation calls (race condition)
@@ -129,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (error || !session) {
         // Session invalid, clear cache and state
+        console.log('🔴 Background validation: Session invalid');
         handleSignOut();
         return;
       }
@@ -144,6 +169,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Don't logout on network errors, keep using cache
     } finally {
       isValidatingSessionRef.current = false; // Unlock
+      // FIX: Ensure loading state is cleared
+      setIsLoading(false);
     }
   };
 
