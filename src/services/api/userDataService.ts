@@ -13,6 +13,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { authStateManager } from '@/lib/authStateManager';
 import type { Database } from '@/integrations/supabase/types';
 
 // ============================================================================
@@ -287,23 +288,20 @@ class UserDataService {
 
   /**
    * Validate user authentication
+   * FIX: INDUSTRY-GRADE - Uses centralized auth state manager to prevent race conditions
    * @private
    */
   private async validateUser(): Promise<string | null> {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // FIX: Use centralized auth state manager (single source of truth)
+      const userId = await authStateManager.getUserId();
       
-      if (error) {
-        console.error('[UserDataService] Authentication error:', error);
-        return null;
-      }
-
-      if (!session?.user?.id) {
+      if (!userId) {
         console.error('[UserDataService] No authenticated user found');
         return null;
       }
 
-      return session.user.id;
+      return userId;
     } catch (error) {
       console.error('[UserDataService] Failed to validate user:', error);
       return null;

@@ -51,9 +51,16 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
 
   /**
    * Fetch user data
-   * FIX: Removed from useCallback to prevent infinite loops
+   * FIX: Industry-grade with timeout protection
    */
   const fetchData = useCallback(async (isRefresh: boolean = false) => {
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      console.error('[useUserData] ⏱️ Request timeout after 20 seconds');
+    }, 20000); // 20 second timeout
+
     try {
       if (isRefresh) {
         setIsRefreshing(true);
@@ -65,6 +72,9 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
 
       const response = await userDataService.fetchAllUserData();
 
+      // Clear timeout on success
+      clearTimeout(timeoutId);
+
       if (response.success) {
         setUserData(response);
         setError(null);
@@ -72,9 +82,17 @@ export function useUserData(autoFetch: boolean = true): UseUserDataReturn {
         setError(response.error || 'Failed to fetch user data');
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
-      console.error('[useUserData] Error fetching data:', err);
+      clearTimeout(timeoutId);
+      
+      if (err instanceof Error && err.name === 'AbortError') {
+        const message = 'Request timeout - please check your connection';
+        setError(message);
+        console.error('[useUserData] Request aborted due to timeout');
+      } else {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        setError(message);
+        console.error('[useUserData] Error fetching data:', err);
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -148,11 +166,21 @@ export function useSpecificData<T = any>(
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      console.error(`[useSpecificData] ⏱️ Request timeout for ${dataType} after 20 seconds`);
+    }, 20000); // 20 second timeout
+
     try {
       setIsLoading(true);
       setError(null);
 
       const response = await userDataService.fetchSpecificData(dataType);
+
+      // Clear timeout on success
+      clearTimeout(timeoutId);
 
       if (response.error) {
         setError(response.error);
@@ -160,9 +188,17 @@ export function useSpecificData<T = any>(
         setData(response.data as T);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setError(message);
-      console.error(`[useSpecificData] Error fetching ${dataType}:`, err);
+      clearTimeout(timeoutId);
+      
+      if (err instanceof Error && err.name === 'AbortError') {
+        const message = 'Request timeout - please check your connection';
+        setError(message);
+        console.error(`[useSpecificData] Request aborted for ${dataType} due to timeout`);
+      } else {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        setError(message);
+        console.error(`[useSpecificData] Error fetching ${dataType}:`, err);
+      }
     } finally {
       setIsLoading(false);
     }

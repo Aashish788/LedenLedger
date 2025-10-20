@@ -8,10 +8,31 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+/**
+ * INDUSTRY-GRADE Supabase Client Configuration
+ * - Optimized for localhost and production
+ * - Better timeout and retry logic
+ * - Enhanced session persistence
+ */
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+    detectSessionInUrl: true,
+    flowType: 'pkce', // More secure auth flow
+    storageKey: 'lenden-ledger-auth', // Unique storage key to avoid conflicts
+  },
+  global: {
+    headers: {
+      'x-application-name': 'lenden-ledger',
+    },
+  },
+  db: {
+    schema: 'public',
+  },
+  // FIX: Add timeout for requests to prevent infinite loading
+  realtime: {
+    timeout: 10000, // 10 second timeout
+  },
 });

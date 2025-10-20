@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { secureStorage, generateCSRFToken, checkRateLimit } from '@/lib/security';
 import { authCache } from '@/lib/authCache';
+import { authStateManager } from '@/lib/authStateManager';
 import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 export interface User {
@@ -70,34 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Professional initialization - check session in background only if needed
   useEffect(() => {
-    // FIX: CRITICAL - Proper session restoration after browser close/reopen
+    // If we have cached auth, validate in background (non-blocking)
     const initAuth = async () => {
       if (cachedState?.isAuthenticated) {
-        // FIX: Show loading while we verify the cached session is still valid
-        setIsLoading(true);
-        
-        try {
-          // Verify cached session is still valid
-          const { data: { session }, error } = await supabase.auth.getSession();
-          
-          if (error || !session) {
-            // Session expired - clear everything immediately
-            console.log('🔴 Cached session expired, clearing...');
-            handleSignOut();
-            return;
-          }
-          
-          // Session is valid - load user data
-          console.log('✅ Cached session valid, loading profile...');
-          await loadUserProfile(session.user, false);
-          authCache.markSessionChecked();
-        } catch (error) {
-          console.error('❌ Session verification failed:', error);
-          handleSignOut();
-        } finally {
-          // FIX: Always clear loading state
-          setIsLoading(false);
-        }
+        // User sees UI immediately, we validate in background
+        validateSessionInBackground();
       } else {
         // No cache, check session (but only once on mount)
         await checkSession();
@@ -106,31 +84,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initAuth();
     
-    // Listen for auth state changes (token refresh, logout, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Listen for auth state changes via centralized manager
+    const unsubscribe = authStateManager.subscribe(async (session) => {
       if (import.meta.env.DEV) {
-      console.log('Auth state changed:', event);
-    }
+        console.log('Auth state changed via manager:', session ? 'authenticated' : 'not authenticated');
+      }
       
-      if (event === 'SIGNED_IN' && session) {
+      if (session?.user) {
         await loadUserProfile(session.user, false);
-      } else if (event === 'SIGNED_OUT') {
+      } else {
         handleSignOut();
-      } else if (event === 'TOKEN_REFRESHED' && session) {
-        // Silent refresh - update cache without showing loading
-        await loadUserProfile(session.user, false);
       }
     });
 
     return () => {
-      subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
 
   /**
    * Validate session in background without blocking UI
-   * FIX: CRITICAL - Added mutex to prevent concurrent validation
-   * NOTE: This is now DEPRECATED - we validate on mount instead
+   * FIX: INDUSTRY-GRADE - Uses centralized auth state manager
    */
   const validateSessionInBackground = async (): Promise<void> => {
     // FIX: Prevent concurrent validation calls (race condition)
@@ -149,11 +123,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       isValidatingSessionRef.current = true; // Lock
       
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // FIX: Use centralized auth state manager (prevents race conditions)
+      const session = await authStateManager.getSession();
       
-      if (error || !session) {
+      if (!session) {
         // Session invalid, clear cache and state
-        console.log('🔴 Background validation: Session invalid');
         handleSignOut();
         return;
       }
@@ -169,8 +143,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Don't logout on network errors, keep using cache
     } finally {
       isValidatingSessionRef.current = false; // Unlock
-      // FIX: Ensure loading state is cleared
-      setIsLoading(false);
     }
   };
 
@@ -269,16 +241,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
       }
       
-      // Check Supabase session
-      const { data: { session }, error } = await supabase.auth.getSession();
+      // FIX: Use centralized auth state manager (prevents race conditions)
+      const session = await authStateManager.getSession();
       
-      if (error) {
-        console.error('Session check error:', error);
+      if (!session) {
+        console.error('Session check: No active session');
         handleSignOut();
         return;
       }
 
-      if (session?.user) {
+      if (session.user) {
         await loadUserProfile(session.user, shouldShowLoading);
         authCache.markSessionChecked();
       } else {
