@@ -406,7 +406,7 @@ export default function Invoices() {
                             </div>
                           </div>
                           <div className="text-sm font-semibold">
-                            ₹{item.amount.toFixed(2)}
+                            ₹{Number(item.amount).toFixed(2)}
                           </div>
                         </div>
                       </div>

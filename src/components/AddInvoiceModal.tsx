@@ -312,7 +312,7 @@ export function AddInvoiceModal({ open, onOpenChange, onInvoiceAdded }: AddInvoi
                   </div>
                   <div className="col-span-2">
                     <Input
-                      value={`₹${item.amount.toFixed(2)}`}
+                      value={`₹${Number(item.amount).toFixed(2)}`}
                       disabled
                       className="h-10 bg-background"
                     />
