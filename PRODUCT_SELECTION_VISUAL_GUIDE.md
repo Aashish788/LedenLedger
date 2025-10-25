@@ -528,6 +528,7 @@ Step 10: DONE 🎉
 ---
 
 **📚 Reference this guide when:**
+
 - Onboarding new developers
 - Debugging issues
 - Adding new features

@@ -93,7 +93,7 @@ export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: Cr
   const [isSaving, setIsSaving] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
-    business: true,
+    business: false,
     customer: true,
     items: true,
     tax: false,

@@ -9,19 +9,21 @@ You can now **select products directly from your inventory** when creating invoi
 ## ⚡ Quick Demo (30 seconds)
 
 ### **Before** (The Old Way) 😓
+
 ```
 1. Click "Create Invoice"
 2. Type product name manually
 3. Remember and type price
 4. Remember and type HSN code
 5. Hope you got everything right
-6. Repeat for each product... 
+6. Repeat for each product...
 ❌ 5+ minutes per invoice
 ❌ Error-prone
 ❌ Tedious
 ```
 
 ### **After** (The New Way) 🎉
+
 ```
 1. Click "Create Invoice"
 2. Click "Select Products"
@@ -40,11 +42,13 @@ You can now **select products directly from your inventory** when creating invoi
 ### **Step-by-Step:**
 
 #### 1️⃣ **Open Invoice Creation**
+
 ```
 Go to: Invoices → Click "Create Invoice"
 ```
 
 #### 2️⃣ **Click "Select Products"**
+
 ```
 In Items section, you'll see:
 ┌─────────────────────────────────┐
@@ -54,6 +58,7 @@ Click the blue "Select Products" button
 ```
 
 #### 3️⃣ **Find Your Products**
+
 ```
 Use the search bar:
 🔍 "laptop" → Shows all laptops
@@ -67,6 +72,7 @@ Or use category filter:
 ```
 
 #### 4️⃣ **Select Products**
+
 ```
 Click on any product card:
 ┌─────────────────────────────────┐
@@ -81,6 +87,7 @@ Click on any product card:
 ```
 
 #### 5️⃣ **Adjust Quantities**
+
 ```
 Use the +/- buttons or type:
 Quantity: [-] [5] [+]
@@ -90,6 +97,7 @@ Total: ₹2,25,000
 ```
 
 #### 6️⃣ **Add to Invoice**
+
 ```
 Click "Add to Invoice (3)" button at bottom
 → Products added instantly!
@@ -102,6 +110,7 @@ Click "Add to Invoice (3)" button at bottom
 ## 💡 Pro Tips
 
 ### **Tip 1: Multi-Select is Your Friend**
+
 ```
 ✓ Select 10 products at once
 ✓ Set all quantities
@@ -110,6 +119,7 @@ Click "Add to Invoice (3)" button at bottom
 ```
 
 ### **Tip 2: Mix & Match**
+
 ```
 ✓ Add products from inventory
 ✓ Then click "Add Manually" for custom items
@@ -117,6 +127,7 @@ Click "Add to Invoice (3)" button at bottom
 ```
 
 ### **Tip 3: Stock Awareness**
+
 ```
 🟢 In Stock → Ready to add
 🟡 Low Stock → Warning shown
@@ -124,6 +135,7 @@ Click "Add to Invoice (3)" button at bottom
 ```
 
 ### **Tip 4: Fast Search**
+
 ```
 Type partial names:
 "lap" finds "Laptop", "Lapto", "LapDesk"
@@ -135,6 +147,7 @@ Works for SKU and barcode too!
 ## 🎨 Visual Guide
 
 ### **Button Location:**
+
 ```
 Create Invoice Modal
 ├── Business Details (auto-filled ✓)
@@ -145,6 +158,7 @@ Create Invoice Modal
 ```
 
 ### **Product Card Explained:**
+
 ```
 ┌────────────────────────────────────────┐
 │ ☑ Product Name                          │  ← Click to select
@@ -156,6 +170,7 @@ Create Invoice Modal
 ```
 
 ### **Stock Status Colors:**
+
 ```
 🟢 Green = In Stock (Plenty available)
 🟡 Yellow = Low Stock (Running out)
@@ -167,6 +182,7 @@ Create Invoice Modal
 ## 🔥 Real-World Examples
 
 ### **Example 1: Computer Shop Invoice**
+
 ```
 Customer: "I need 3 laptops and 5 mice"
 
@@ -181,17 +197,19 @@ Done in 30 seconds! ⚡
 ```
 
 ### **Example 2: Mixed Invoice**
+
 ```
 Customer: "2 desks and installation service"
 
 Solution:
 1. Click "Select Products" → Add desks
 2. Click "Add Manually" → Add "Installation"
-3. Done! 
+3. Done!
 Best of both worlds! ✨
 ```
 
 ### **Example 3: Bulk Order**
+
 ```
 Customer wants 20 different items
 
@@ -210,24 +228,31 @@ Done in 2 minutes! 🚀
 ## ❓ FAQ
 
 ### **Q: Can I still add items manually?**
+
 **A:** Yes! Use "Add Manually" button. Both methods work together.
 
 ### **Q: What if product is out of stock?**
+
 **A:** It shows red "Out of Stock" badge and can't be selected. Prevents errors!
 
 ### **Q: Can I edit after adding?**
+
 **A:** Yes! All invoice items remain fully editable.
 
 ### **Q: Does it update inventory?**
+
 **A:** Invoice creation doesn't change stock. Inventory updates separately.
 
 ### **Q: What if I select wrong product?**
+
 **A:** Just click again to deselect, or remove from invoice items after.
 
 ### **Q: How many products can I select at once?**
+
 **A:** Unlimited! Select as many as you need.
 
 ### **Q: Does search work for barcodes?**
+
 **A:** Yes! Search works for name, SKU, and barcode.
 
 ---
@@ -235,6 +260,7 @@ Done in 2 minutes! 🚀
 ## 🎓 Advanced Features
 
 ### **Smart Filtering:**
+
 ```
 Combine search + category:
 1. Select "Electronics" category
@@ -243,14 +269,16 @@ Combine search + category:
 ```
 
 ### **Quantity Shortcuts:**
+
 ```
 • Click [-] to decrease
-• Click [+] to increase  
+• Click [+] to increase
 • Type directly for exact number
 • Can't exceed available stock (protected!)
 ```
 
 ### **Live Calculations:**
+
 ```
 As you change quantity:
 → Total updates instantly
@@ -262,20 +290,21 @@ As you change quantity:
 
 ## 🏆 Benefits
 
-| Feature | Benefit |
-|---------|---------|
-| **Auto-Fill** | No typing errors |
-| **Stock Status** | Prevent overselling |
-| **Multi-Select** | 10x faster invoicing |
-| **Search** | Find products instantly |
-| **Live Totals** | Know cost before adding |
-| **Validation** | Can't exceed stock |
+| Feature          | Benefit                 |
+| ---------------- | ----------------------- |
+| **Auto-Fill**    | No typing errors        |
+| **Stock Status** | Prevent overselling     |
+| **Multi-Select** | 10x faster invoicing    |
+| **Search**       | Find products instantly |
+| **Live Totals**  | Know cost before adding |
+| **Validation**   | Can't exceed stock      |
 
 ---
 
 ## 🎯 Best Practices
 
 ### **✅ DO:**
+
 - Keep inventory updated
 - Use search for large inventories
 - Select multiple products at once
@@ -283,6 +312,7 @@ As you change quantity:
 - Use stock status as guide
 
 ### **❌ DON'T:**
+
 - Add out-of-stock items (system prevents anyway)
 - Forget to set quantities
 - Skip inventory setup
@@ -293,15 +323,18 @@ As you change quantity:
 ## 🚨 Troubleshooting
 
 ### **Products not showing?**
+
 1. Check if products exist in Inventory page
 2. Refresh the page
 3. Check internet connection
 
 ### **Can't select a product?**
+
 1. Check if it's out of stock (red badge)
 2. Verify product is "for sale" in inventory
 
 ### **Search not working?**
+
 1. Try different search terms
 2. Check spelling
 3. Use category filter instead
@@ -320,6 +353,7 @@ As you change quantity:
 ## 🎊 Conclusion
 
 This feature makes invoice creation:
+
 - **90% Faster** ⚡
 - **100% Accurate** ✅
 - **Completely Effortless** 🎯
@@ -338,4 +372,4 @@ Start using it today and experience the difference!
 
 **🎉 Happy Invoicing!**
 
-*Built with decades of expertise to make your life easier.*
+_Built with decades of expertise to make your life easier._

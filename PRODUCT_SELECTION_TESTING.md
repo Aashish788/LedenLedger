@@ -1,11 +1,13 @@
 # 🧪 Quick Testing Guide - Product Selection Feature
 
 ## 🎯 Purpose
+
 Verify that products can be selected from inventory and added to invoice items seamlessly.
 
 ---
 
 ## ✅ Prerequisites
+
 1. Have some products in Inventory
 2. Navigate to Invoices page
 3. Have business settings configured
@@ -15,6 +17,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ## 🔥 Test Scenarios
 
 ### **Test 1: Basic Product Selection**
+
 1. Click **"Create Invoice"** button
 2. Scroll to **Items** section
 3. Click **"Select Products"** button
@@ -29,6 +32,7 @@ Verify that products can be selected from inventory and added to invoice items s
 12. ✅ **Verify**: Toast notification shows success
 
 **Expected Result:**
+
 - Product details auto-filled in invoice
 - Name, price, quantity all correct
 - Amount calculated properly
@@ -36,6 +40,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 2: Multi-Product Selection**
+
 1. Open **"Select Products"** modal
 2. Select **3 different products**
 3. Adjust quantities for each
@@ -46,6 +51,7 @@ Verify that products can be selected from inventory and added to invoice items s
 8. ✅ **Verify**: Toast shows "Added 3 products to invoice"
 
 **Expected Result:**
+
 - All 3 products listed in items
 - Each with correct details
 - Totals calculated properly
@@ -53,6 +59,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 3: Search Functionality**
+
 1. Open product selection modal
 2. Type **"laptop"** in search box
 3. ✅ **Verify**: Only matching products shown
@@ -62,6 +69,7 @@ Verify that products can be selected from inventory and added to invoice items s
 7. ✅ **Verify**: Search works for all fields
 
 **Expected Result:**
+
 - Search is case-insensitive
 - Filters instantly
 - Shows relevant products only
@@ -69,6 +77,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 4: Category Filtering**
+
 1. Open product selection modal
 2. Click **Category dropdown**
 3. Select **"Electronics"**
@@ -77,6 +86,7 @@ Verify that products can be selected from inventory and added to invoice items s
 6. ✅ **Verify**: All products shown again
 
 **Expected Result:**
+
 - Categories are dynamically loaded
 - Filtering works instantly
 - Can switch between categories
@@ -84,6 +94,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 5: Stock Status Indicators**
+
 1. Open product selection modal
 2. Find product with **0 quantity** (if exists)
 3. ✅ **Verify**: Shows "Out of Stock" red badge
@@ -94,6 +105,7 @@ Verify that products can be selected from inventory and added to invoice items s
 8. ✅ **Verify**: Shows "In Stock" green badge
 
 **Expected Result:**
+
 - Stock status clearly visible
 - Out-of-stock products disabled
 - Color coding is intuitive
@@ -101,6 +113,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 6: Quantity Controls**
+
 1. Select a product
 2. Click **[-]** button
 3. ✅ **Verify**: Quantity decreases
@@ -112,6 +125,7 @@ Verify that products can be selected from inventory and added to invoice items s
 9. ✅ **Verify**: Total updates in real-time
 
 **Expected Result:**
+
 - Quantity controls work smoothly
 - Validation prevents invalid values
 - Live total calculation
@@ -119,6 +133,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 7: Combined Search + Filter**
+
 1. Open product selection modal
 2. Type **"wireless"** in search
 3. Select **"Electronics"** category
@@ -127,6 +142,7 @@ Verify that products can be selected from inventory and added to invoice items s
 6. ✅ **Verify**: Shows all electronics
 
 **Expected Result:**
+
 - Both filters work together
 - Results are accurate
 - No UI glitches
@@ -134,6 +150,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 8: Manual + Selected Products**
+
 1. Click **"Select Products"**
 2. Add 2 products from inventory
 3. Click **"Add Manually"**
@@ -143,6 +160,7 @@ Verify that products can be selected from inventory and added to invoice items s
 7. ✅ **Verify**: All editable
 
 **Expected Result:**
+
 - Both methods work together
 - No conflicts
 - Full flexibility maintained
@@ -150,6 +168,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 9: Empty Inventory**
+
 1. Ensure inventory has 0 products
 2. Open **"Select Products"** modal
 3. ✅ **Verify**: Shows empty state message
@@ -157,6 +176,7 @@ Verify that products can be selected from inventory and added to invoice items s
 5. ✅ **Verify**: No errors or crashes
 
 **Expected Result:**
+
 - Graceful empty state
 - Clear messaging
 - User knows what to do
@@ -164,6 +184,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 10: Product Details Accuracy**
+
 1. In **Inventory**, note a product's details:
    - Name: "Dell Laptop"
    - Price: ₹45,000
@@ -178,6 +199,7 @@ Verify that products can be selected from inventory and added to invoice items s
 8. ✅ **Verify**: Saved data matches
 
 **Expected Result:**
+
 - 100% data accuracy
 - No transcription errors
 - All fields populated
@@ -185,6 +207,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 11: Stock Validation**
+
 1. Find product with **5 units** in stock
 2. Select it in modal
 3. Try to set quantity to **10**
@@ -193,6 +216,7 @@ Verify that products can be selected from inventory and added to invoice items s
 6. ✅ **Verify**: Warning shown (if any)
 
 **Expected Result:**
+
 - Cannot oversell stock
 - Clear validation
 - User understands limits
@@ -200,6 +224,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 12: UI Responsiveness**
+
 1. Open modal on **desktop**
 2. ✅ **Verify**: Full-width modal, 5 columns
 3. Resize to **tablet**
@@ -208,6 +233,7 @@ Verify that products can be selected from inventory and added to invoice items s
 6. ✅ **Verify**: Still usable, scrollable
 
 **Expected Result:**
+
 - Responsive design works
 - Touch-friendly on mobile
 - No horizontal scroll
@@ -215,6 +241,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 13: Cancel & Close**
+
 1. Open product selection modal
 2. Select 3 products
 3. Adjust quantities
@@ -227,6 +254,7 @@ Verify that products can be selected from inventory and added to invoice items s
 10. ✅ **Verify**: Same behavior as Cancel
 
 **Expected Result:**
+
 - Cancel works properly
 - State resets on reopen
 - No unintended additions
@@ -234,6 +262,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 14: Performance with Many Products**
+
 1. Ensure inventory has **50+ products**
 2. Open product selection modal
 3. ✅ **Verify**: Loads quickly (< 1 second)
@@ -245,6 +274,7 @@ Verify that products can be selected from inventory and added to invoice items s
 9. ✅ **Verify**: No lag
 
 **Expected Result:**
+
 - Fast performance
 - No stuttering
 - Efficient rendering
@@ -252,6 +282,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ---
 
 ### **Test 15: Real-Time Inventory Sync**
+
 1. Open product selection modal
 2. In another tab, update product in Inventory
 3. Return to invoice modal
@@ -260,6 +291,7 @@ Verify that products can be selected from inventory and added to invoice items s
 6. ✅ **Verify**: Latest data used
 
 **Expected Result:**
+
 - Real-time sync works
 - Data always current
 - No stale information
@@ -269,25 +301,33 @@ Verify that products can be selected from inventory and added to invoice items s
 ## 🐛 Common Issues & Solutions
 
 ### Issue: Products not showing
+
 **Solution:**
+
 - Check if products exist in Inventory
 - Verify InventoryContext is loaded
 - Check browser console for errors
 
 ### Issue: Can't select product
+
 **Solution:**
+
 - Check if product is out of stock
 - Verify stock quantity > 0
 - Check for JavaScript errors
 
 ### Issue: Quantities not updating
+
 **Solution:**
+
 - Ensure product is selected first
 - Check min/max validation
 - Verify state updates
 
 ### Issue: Toast not showing
+
 **Solution:**
+
 - Check Sonner toast provider
 - Verify toast import
 - Check browser notifications
@@ -297,6 +337,7 @@ Verify that products can be selected from inventory and added to invoice items s
 ## 📊 Success Criteria
 
 ### All Tests Must Pass:
+
 - [ ] Basic selection works
 - [ ] Multi-product selection works
 - [ ] Search functionality works
@@ -314,6 +355,7 @@ Verify that products can be selected from inventory and added to invoice items s
 - [ ] Real-time sync works
 
 ### Visual Checks:
+
 - [ ] Modal design is clean
 - [ ] Product cards look good
 - [ ] Badges are visible
@@ -322,6 +364,7 @@ Verify that products can be selected from inventory and added to invoice items s
 - [ ] Dark mode works
 
 ### Functional Checks:
+
 - [ ] No console errors
 - [ ] No TypeScript errors
 - [ ] All buttons work
@@ -347,11 +390,11 @@ Verify that products can be selected from inventory and added to invoice items s
 
 After completing all tests:
 
-**Date Tested:** ___________
-**Tested By:** ___________
+**Date Tested:** ****\_\_\_****
+**Tested By:** ****\_\_\_****
 **Result:** [ ] Pass [ ] Fail
-**Issues Found:** ___________
-**Notes:** ___________
+**Issues Found:** ****\_\_\_****
+**Notes:** ****\_\_\_****
 
 ---
 
