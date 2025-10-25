@@ -1,9 +1,10 @@
 /**
  * Inventory Service - Industry-Grade Supabase Integration
- * Handles all inventory and stock transaction operations
+ * Handles all inventory and stock transaction operations with real-time sync
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { realtimeSyncService } from '@/services/realtime/realtimeSyncService';
 
 // Database row type (matches Supabase schema exactly)
 export interface InventoryRow {
@@ -238,24 +239,23 @@ class InventoryService {
     const id = `PRD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const row = this.mapProductToRow(product, user.id);
 
-    const { data, error } = await (supabase as any)
-      .from('inventory')
-      .insert({
-        id,
+    const result = await realtimeSyncService.create<InventoryRow>(
+      'inventory',
+      {
         ...row,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         synced_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+      },
+      { optimisticId: id }
+    );
 
-    if (error) {
-      console.error('Error creating product:', error);
-      throw error;
+    if (result.error || !result.data) {
+      console.error('Error creating product:', result.error);
+      throw result.error || new Error('Failed to create product');
     }
 
-    return this.mapRowToProduct(data);
+    return this.mapRowToProduct(result.data);
   }
 
   /**
@@ -267,24 +267,22 @@ class InventoryService {
 
     const row = this.mapProductToRow(updates, user.id);
 
-    const { data, error } = await (supabase as any)
-      .from('inventory')
-      .update({
+    const result = await realtimeSyncService.update<InventoryRow>(
+      'inventory',
+      id,
+      {
         ...row,
         updated_at: new Date().toISOString(),
         synced_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single();
+      }
+    );
 
-    if (error) {
-      console.error('Error updating product:', error);
-      throw error;
+    if (result.error || !result.data) {
+      console.error('Error updating product:', result.error);
+      throw result.error || new Error('Failed to update product');
     }
 
-    return this.mapRowToProduct(data);
+    return this.mapRowToProduct(result.data);
   }
 
   /**
@@ -294,18 +292,11 @@ class InventoryService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    const { error } = await (supabase as any)
-      .from('inventory')
-      .update({
-        deleted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .eq('user_id', user.id);
+    const result = await realtimeSyncService.delete('inventory', id);
 
-    if (error) {
-      console.error('Error deleting product:', error);
-      throw error;
+    if (result.error) {
+      console.error('Error deleting product:', result.error);
+      throw result.error;
     }
   }
 
@@ -393,12 +384,10 @@ class InventoryService {
 
     const id = `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Start transaction: create stock transaction and update product quantity
-    const { data, error } = await (supabase as any)
-      .from('stock_transactions')
-      .insert({
-        id,
-        user_id: user.id,
+    // Create stock transaction using realtime sync service
+    const result = await realtimeSyncService.create<StockTransactionRow>(
+      'stock_transactions',
+      {
         product_id: transaction.product_id,
         type: transaction.type,
         quantity: transaction.quantity,
@@ -406,16 +395,16 @@ class InventoryService {
         amount: transaction.amount,
         note: transaction.note,
         timestamp: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
         synced_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+        deleted_at: null,
+        device_id: null,
+      } as any,
+      { optimisticId: id }
+    );
 
-    if (error) {
-      console.error('Error creating stock transaction:', error);
-      throw error;
+    if (result.error || !result.data) {
+      console.error('Error creating stock transaction:', result.error);
+      throw result.error || new Error('Failed to create stock transaction');
     }
 
     // Update product quantity and cost price (for stock in)
@@ -439,6 +428,7 @@ class InventoryService {
       });
     }
 
+    const data = result.data;
     return {
       id: data.id,
       product_id: data.product_id,

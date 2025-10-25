@@ -33,7 +33,9 @@ export type TableName =
   | 'staff' 
   | 'attendance'
   | 'business_settings'
-  | 'profiles';
+  | 'profiles'
+  | 'inventory'
+  | 'stock_transactions';
 
 export type ChangeType = 'INSERT' | 'UPDATE' | 'DELETE';
 

@@ -16,7 +16,8 @@ import {
   Trash2, 
   Save, 
   Download, 
-  ChevronDown
+  ChevronDown,
+  Package
 } from "lucide-react";
 import { InvoiceData, InvoiceItem } from "@/types/invoice";
 import { 
@@ -39,6 +40,8 @@ import {
   renderInvoiceTemplate
 } from "@/lib/invoiceTemplates";
 import { supabase } from "@/integrations/supabase/client";
+import { useBusinessContext } from "@/contexts/BusinessContext";
+import ProductSelectionModal, { SelectedProduct } from "@/components/ProductSelectionModal";
 
 interface CreateInvoiceModalProps {
   open: boolean;
@@ -47,12 +50,15 @@ interface CreateInvoiceModalProps {
 }
 
 export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: CreateInvoiceModalProps) {
+  // Get business profile from context
+  const { businessProfile } = useBusinessContext();
+  
   // Form State
   const [billNumber, setBillNumber] = useState("");
   const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState(calculateDueDate(new Date(), 30).toISOString().split('T')[0]);
   
-  // Business & Customer
+  // Business & Customer - Initialize with business profile data
   const [businessName, setBusinessName] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
   const [businessPhone, setBusinessPhone] = useState("");
@@ -85,6 +91,7 @@ export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: Cr
   const [selectedTemplate, setSelectedTemplate] = useState("modern");
   const [currencyCode, setCurrencyCode] = useState("INR");
   const [isSaving, setIsSaving] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     business: true,
     customer: true,
@@ -97,6 +104,56 @@ export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: Cr
   useEffect(() => {
     setBillNumber(generateInvoiceNumber("INV", 0, new Date().getFullYear()));
   }, []);
+  
+  // 🎯 AUTO-POPULATE BUSINESS DETAILS FROM SETTINGS
+  useEffect(() => {
+    if (businessProfile && open) {
+      console.log('🏢 Auto-populating business details from Settings:', businessProfile);
+      
+      // Populate business information from settings
+      if (businessProfile.businessName) {
+        setBusinessName(businessProfile.businessName);
+      }
+      
+      if (businessProfile.phone) {
+        setBusinessPhone(businessProfile.phone);
+      }
+      
+      if (businessProfile.email) {
+        setBusinessEmail(businessProfile.email);
+      }
+      
+      if (businessProfile.gstNumber) {
+        setBusinessGST(businessProfile.gstNumber);
+      }
+      
+      if (businessProfile.state) {
+        setBusinessState(businessProfile.state);
+      }
+      
+      // Build complete business address
+      const addressParts = [
+        businessProfile.address,
+        businessProfile.city,
+        businessProfile.state,
+        businessProfile.pincode
+      ].filter(Boolean);
+      
+      if (addressParts.length > 0) {
+        setBusinessAddress(addressParts.join(', '));
+      }
+      
+      // Set currency from business settings
+      if (businessProfile.currency) {
+        setCurrencyCode(businessProfile.currency);
+      }
+      
+      toast.success("Business details loaded from Settings", {
+        description: `${businessProfile.businessName || 'Your business'} information auto-filled`,
+        duration: 2000,
+      });
+    }
+  }, [businessProfile, open]);
   
   // Auto-determine GST type
   useEffect(() => {
@@ -187,6 +244,30 @@ export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: Cr
     if (items.length > 1) {
       setItems(prev => prev.filter(item => item.id !== id));
     }
+  };
+  
+  // Handle products selected from inventory
+  const handleProductsSelected = (selectedProducts: SelectedProduct[]) => {
+    console.log('🛒 Products selected from inventory:', selectedProducts);
+    
+    // Convert selected products to invoice items
+    const newItems: InvoiceItem[] = selectedProducts.map(product => ({
+      id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: product.name,
+      description: product.description || "",
+      hsn: product.hsn || "",
+      quantity: product.quantity.toString(),
+      price: product.price.toString(),
+      discount: product.discount.toString(),
+      amount: product.amount.toString()
+    }));
+    
+    // Add to existing items
+    setItems(prev => [...prev, ...newItems]);
+    
+    toast.success(`Added ${selectedProducts.length} product${selectedProducts.length !== 1 ? 's' : ''} to invoice`, {
+      description: selectedProducts.map(p => `${p.name} (${p.quantity}x)`).join(', ')
+    });
   };
   
   const handlePaymentTermsChange = (days: number) => {
@@ -396,7 +477,12 @@ export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: Cr
                   onClick={() => toggleSection('business')}
                   className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
                 >
-                  <span className="text-sm font-semibold">Your Business</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">Your Business</span>
+                    <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
+                      Auto-filled from Settings
+                    </Badge>
+                  </div>
                   <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedSections.business ? 'rotate-180' : ''}`} />
                 </button>
                 {expandedSections.business && (
@@ -558,10 +644,21 @@ export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: Cr
               <div className="bg-card rounded-xl shadow-sm border">
                 <div className="flex items-center justify-between p-4 border-b">
                   <span className="text-sm font-semibold">Items</span>
-                  <Button onClick={addItem} size="sm" variant="ghost" className="h-8 text-xs">
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Add
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={() => setIsProductModalOpen(true)} 
+                      size="sm" 
+                      variant="default"
+                      className="h-8 text-xs"
+                    >
+                      <Package className="h-3.5 w-3.5 mr-1.5" />
+                      Select Products
+                    </Button>
+                    <Button onClick={addItem} size="sm" variant="ghost" className="h-8 text-xs">
+                      <Plus className="h-3.5 w-3.5 mr-1" />
+                      Add Manually
+                    </Button>
+                  </div>
                 </div>
                 <div className="p-4 space-y-3">
                   {items.map((item, index) => (
@@ -808,6 +905,13 @@ export default function CreateInvoiceModal({ open, onOpenChange, onSuccess }: Cr
           </div>
         </div>
       </DialogContent>
+
+      {/* Product Selection Modal */}
+      <ProductSelectionModal
+        open={isProductModalOpen}
+        onOpenChange={setIsProductModalOpen}
+        onSelectProducts={handleProductsSelected}
+      />
     </Dialog>
   );
 }
