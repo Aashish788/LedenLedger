@@ -6,6 +6,7 @@ import {
   FileText, 
   Wallet, 
   UserCog,
+  Package2,
   ShoppingCart,
   Package,
   TrendingUp,
@@ -38,6 +39,7 @@ const businessNav = [
   { title: "Invoices", url: "/invoices", icon: FileText },
   { title: "Cash Book", url: "/cashbook", icon: Wallet },
   { title: "Staff", url: "/staff", icon: UserCog },
+  { title: "Inventory", url: "/inventory", icon: Package2 },
 ];
 
 const transactionNav = [

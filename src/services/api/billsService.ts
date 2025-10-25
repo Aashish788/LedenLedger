@@ -54,6 +54,10 @@ export interface Bill {
   terms: string | null;
   tax_amount: number;
   discount_amount: number;
+  // 🆕 NEW DISCOUNT COLUMNS (added to database)
+  discount: number; // Total discount amount
+  discount_type: 'percentage' | 'flat' | null; // Type of discount
+  discount_value: number | null; // Original discount value before calculation
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -83,6 +87,10 @@ export interface CreateBillInput {
   terms?: string;
   tax_amount?: number;
   discount_amount?: number;
+  // 🆕 NEW DISCOUNT FIELDS
+  discount?: number;
+  discount_type?: 'percentage' | 'flat';
+  discount_value?: number;
 }
 
 export interface UpdateBillInput {
@@ -98,6 +106,10 @@ export interface UpdateBillInput {
   terms?: string;
   tax_amount?: number;
   discount_amount?: number;
+  // 🆕 NEW DISCOUNT FIELDS
+  discount?: number;
+  discount_type?: 'percentage' | 'flat';
+  discount_value?: number;
 }
 
 export interface FetchBillsOptions {
@@ -297,6 +309,10 @@ class BillsService {
         terms: input.terms || null,
         tax_amount: input.tax_amount || 0,
         discount_amount: input.discount_amount || 0,
+        // 🆕 NEW DISCOUNT FIELDS - Save to database
+        discount: input.discount || 0,
+        discount_type: input.discount_type || null,
+        discount_value: input.discount_value || null,
         deleted_at: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

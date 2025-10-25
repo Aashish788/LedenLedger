@@ -91,6 +91,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       if (session?.user) {
+        // Check subscription for OAuth logins (Google, etc)
+        const { checkSubscriptionStatus } = await import('@/lib/subscription');
+        const subscriptionStatus = await checkSubscriptionStatus(session.user.id);
+        
+        if (!subscriptionStatus.isPremium) {
+          // Sign out non-premium users
+          await supabase.auth.signOut();
+          
+          if (subscriptionStatus.isExpired) {
+            toast.error('Subscription Expired', {
+              description: 'Your subscription has expired. Please renew in the mobile app.',
+              duration: 6000,
+            });
+          } else {
+            toast.error('Premium Access Required', {
+              description: 'Web access is only available for premium users. Subscribe in the mobile app first.',
+              duration: 6000,
+            });
+          }
+          
+          handleSignOut();
+          return;
+        }
+        
+        // Premium user - load profile
         await loadUserProfile(session.user, false);
       } else {
         handleSignOut();
@@ -327,6 +352,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
+      // ✅ CHECK PREMIUM SUBSCRIPTION - Industry Grade Implementation
+      const { checkSubscriptionStatus } = await import('@/lib/subscription');
+      const subscriptionStatus = await checkSubscriptionStatus(data.user.id);
+
+      if (!subscriptionStatus.isPremium) {
+        // Sign out the user immediately
+        await supabase.auth.signOut();
+        
+        // Show premium-only message
+        if (subscriptionStatus.isExpired) {
+          toast.error('Subscription Expired', {
+            description: 'Your subscription has expired. Please renew in the mobile app to access the web version.',
+            duration: 6000,
+          });
+        } else {
+          toast.error('Premium Access Required', {
+            description: 'Web access is only available for premium users. Please subscribe in the mobile app and try again.',
+            duration: 6000,
+          });
+        }
+        
+        return false;
+      }
+
+      // ✅ Premium user verified - proceed with login
       // Load user profile
       await loadUserProfile(data.user, true);
 
@@ -337,7 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       secureStorage.setItem('last_activity', Date.now());
 
       toast.success('Login successful', {
-        description: `Welcome back!`
+        description: `Welcome back, Premium User!`
       });
 
       return true;

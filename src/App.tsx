@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { BusinessProvider } from "@/contexts/BusinessContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { InventoryProvider } from "@/contexts/InventoryContext";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/ProtectedRoute";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { validateEnvironment } from "@/lib/security";
@@ -17,6 +18,8 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 // Lazy load components for better performance
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Customers = lazy(() => import("./pages/Customers"));
 const Suppliers = lazy(() => import("./pages/Suppliers"));
@@ -24,6 +27,9 @@ const Invoices = lazy(() => import("./pages/Invoices"));
 const CashBook = lazy(() => import("./pages/CashBook"));
 const StaffPage = lazy(() => import("./pages/Staff"));
 const StaffDetail = lazy(() => import("./pages/StaffDetail"));
+const InventoryPage = lazy(() => import("./pages/Inventory"));
+const AddProductPage = lazy(() => import("./pages/AddProduct"));
+const ProductDetailPage = lazy(() => import("./pages/ProductDetail"));
 const Sales = lazy(() => import("./pages/Sales"));
 const Purchases = lazy(() => import("./pages/Purchases"));
 const Expenses = lazy(() => import("./pages/Expenses"));
@@ -45,7 +51,7 @@ const queryClient = new QueryClient({
         return failureCount < 3;
       },
       staleTime: 5 * 60 * 1000, // 5 minutes
-      cacheTime: 10 * 60 * 1000, // 10 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (renamed from cacheTime)
     },
     mutations: {
       retry: false, // Don't retry mutations by default
@@ -84,10 +90,11 @@ const App = () => {
         <AuthProvider>
           <BusinessProvider>
             <CurrencyProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
+              <InventoryProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
                       {/* Public routes (accessible without authentication) */}
@@ -105,6 +112,20 @@ const App = () => {
                           <PublicOnlyRoute>
                             <Login />
                           </PublicOnlyRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/forgot-password" 
+                        element={
+                          <PublicOnlyRoute>
+                            <ForgotPassword />
+                          </PublicOnlyRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/reset-password" 
+                        element={
+                          <ResetPassword />
                         } 
                       />
 
@@ -174,6 +195,38 @@ const App = () => {
                         } 
                       />
                       <Route 
+                        path="/inventory" 
+                        element={
+                          <ProtectedRoute>
+                            <InventoryPage />
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/inventory/new" 
+                        element={
+                          <ProtectedRoute>
+                            <AddProductPage />
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/inventory/:id/edit" 
+                        element={
+                          <ProtectedRoute>
+                            <AddProductPage />
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
+                        path="/inventory/:id" 
+                        element={
+                          <ProtectedRoute>
+                            <ProductDetailPage />
+                          </ProtectedRoute>
+                        } 
+                      />
+                      <Route 
                         path="/sales" 
                         element={
                           <ProtectedRoute>
@@ -232,12 +285,13 @@ const App = () => {
                 <Analytics />
                 <SpeedInsights />
               </TooltipProvider>
-            </CurrencyProvider>
-          </BusinessProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
-  );
+            </InventoryProvider>
+          </CurrencyProvider>
+        </BusinessProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
+);
 };
 
 export default App;
